@@ -17,7 +17,7 @@ options:
   jwt_secret: ""
   log_level: info
 schema:
-  jwt_secret: str
+  jwt_secret: str?
   log_level: list(trace|debug|info|warn|error)
 map:
   - data
