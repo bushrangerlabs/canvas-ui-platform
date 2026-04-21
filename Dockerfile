@@ -26,7 +26,7 @@ RUN npm run build
 RUN npm prune --omit=dev
 
 # ── Add-on entrypoint ─────────────────────────────────────────────────────────
-COPY addon/run.sh /run.sh
+COPY run.sh /run.sh
 RUN chmod +x /run.sh
 
 CMD ["/run.sh"]
