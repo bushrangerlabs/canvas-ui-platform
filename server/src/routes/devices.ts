@@ -1,0 +1,157 @@
+import { FastifyInstance } from 'fastify';
+import { nanoid } from 'nanoid';
+import { getDb } from '../db/index';
+import { broadcast, sendCommand, getConnectedDeviceIds } from '../ws/index';
+
+export async function deviceRoutes(app: FastifyInstance) {
+  // GET /api/devices
+  app.get('/devices', async () => {
+    const db = getDb();
+    const devices = db.prepare('SELECT * FROM devices ORDER BY name').all() as any[];
+    const connected = new Set(getConnectedDeviceIds());
+    return devices.map(d => ({ ...d, online: connected.has(d.id) }));
+  });
+
+  // GET /api/devices/:id
+  app.get<{ Params: { id: string } }>('/devices/:id', async (req, reply) => {
+    const db = getDb();
+    const row = db.prepare('SELECT * FROM devices WHERE id = ?').get(req.params.id);
+    if (!row) return reply.code(404).send({ error: 'Device not found' });
+    const connected = new Set(getConnectedDeviceIds());
+    return { ...row, online: connected.has(req.params.id) };
+  });
+
+  // POST /api/devices/register  (called by browser/Tauri clients on first boot)
+  app.post<{ Body: any }>('/devices/register', async (req, reply) => {
+    const db = getDb();
+    const body = req.body as any;
+    const id = body.id ?? nanoid(10);
+    const now = new Date().toISOString();
+    const existing = db.prepare('SELECT id FROM devices WHERE id = ?').get(id);
+    if (existing) {
+      // Update last_seen + metadata
+      db.prepare(`UPDATE devices SET last_seen=?, ip_address=?, app_version=?, platform=? WHERE id=?`)
+        .run(now, body.ip_address ?? null, body.app_version ?? null, body.platform ?? 'unknown', id);
+      return db.prepare('SELECT * FROM devices WHERE id = ?').get(id);
+    }
+    db.prepare(`
+      INSERT INTO devices (id, name, platform, description, default_view_id, last_seen, ip_address, app_version, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      body.name ?? id,
+      body.platform ?? 'unknown',
+      body.description ?? null,
+      body.default_view_id ?? null,
+      now,
+      body.ip_address ?? null,
+      body.app_version ?? null,
+      now,
+    );
+    broadcast({ type: 'device_registered', device_id: id }, 'editor');
+    reply.code(201);
+    return db.prepare('SELECT * FROM devices WHERE id = ?').get(id);
+  });
+
+  // PATCH /api/devices/:id
+  app.patch<{ Params: { id: string }; Body: any }>('/devices/:id', async (req, reply) => {
+    const db = getDb();
+    const body = req.body as any;
+    const existing = db.prepare('SELECT * FROM devices WHERE id = ?').get(req.params.id) as any;
+    if (!existing) return reply.code(404).send({ error: 'Device not found' });
+    const fields: string[] = [];
+    const vals: any[] = [];
+    const patchable = ['name', 'description', 'default_view_id', 'screen_on', 'brightness', 'platform'];
+    for (const f of patchable) {
+      if (body[f] !== undefined) { fields.push(`${f}=?`); vals.push(body[f]); }
+    }
+    if (fields.length) {
+      vals.push(req.params.id);
+      db.prepare(`UPDATE devices SET ${fields.join(', ')} WHERE id=?`).run(...vals);
+    }
+    return db.prepare('SELECT * FROM devices WHERE id = ?').get(req.params.id);
+  });
+
+  // DELETE /api/devices/:id
+  app.delete<{ Params: { id: string } }>('/devices/:id', async (req, reply) => {
+    const db = getDb();
+    if (!db.prepare('SELECT id FROM devices WHERE id = ?').get(req.params.id))
+      return reply.code(404).send({ error: 'Device not found' });
+    db.prepare('DELETE FROM devices WHERE id = ?').run(req.params.id);
+    return { success: true };
+  });
+
+  // GET /api/devices/:id/views
+  app.get<{ Params: { id: string } }>('/devices/:id/views', async (req, reply) => {
+    const db = getDb();
+    if (!db.prepare('SELECT id FROM devices WHERE id = ?').get(req.params.id))
+      return reply.code(404).send({ error: 'Device not found' });
+    return db.prepare(`
+      SELECT v.* FROM views v
+      JOIN device_views dv ON dv.view_id = v.id
+      WHERE dv.device_id = ?
+      ORDER BY dv.sort_order
+    `).all(req.params.id).map(parseView);
+  });
+
+  // PUT /api/devices/:id/views  (replace assigned view list)
+  app.put<{ Params: { id: string }; Body: { view_ids: string[] } }>('/devices/:id/views', async (req, reply) => {
+    const db = getDb();
+    if (!db.prepare('SELECT id FROM devices WHERE id = ?').get(req.params.id))
+      return reply.code(404).send({ error: 'Device not found' });
+    db.transaction(() => {
+      db.prepare('DELETE FROM device_views WHERE device_id = ?').run(req.params.id);
+      const insert = db.prepare('INSERT INTO device_views (device_id, view_id, sort_order) VALUES (?, ?, ?)');
+      (req.body.view_ids ?? []).forEach((vid, i) => insert.run(req.params.id, vid, i));
+    })();
+    return { success: true };
+  });
+
+  // POST /api/devices/:id/command  (single device)
+  app.post<{ Params: { id: string }; Body: any }>('/devices/:id/command', async (req, reply) => {
+    const db = getDb();
+    const body = req.body as any;
+    if (req.params.id !== '*' && !db.prepare('SELECT id FROM devices WHERE id = ?').get(req.params.id))
+      return reply.code(404).send({ error: 'Device not found' });
+    const now = new Date().toISOString();
+    const cmdId = db.prepare(
+      'INSERT INTO commands (device_id, action, payload, source, sent_at) VALUES (?, ?, ?, ?, ?)'
+    ).run(req.params.id, body.action, JSON.stringify(body.payload ?? {}), body.source ?? 'api', now).lastInsertRowid;
+    sendCommand(req.params.id, {
+      type: 'command',
+      id: cmdId,
+      device_id: req.params.id,
+      action: body.action,
+      payload: body.payload ?? {},
+    });
+    reply.code(202);
+    return { command_id: cmdId };
+  });
+
+  // POST /api/devices/command  (broadcast to all)
+  app.post<{ Body: any }>('/devices/command', async (req, reply) => {
+    const db = getDb();
+    const body = req.body as any;
+    const now = new Date().toISOString();
+    const cmdId = db.prepare(
+      'INSERT INTO commands (device_id, action, payload, source, sent_at) VALUES (?, ?, ?, ?, ?)'
+    ).run('*', body.action, JSON.stringify(body.payload ?? {}), body.source ?? 'api', now).lastInsertRowid;
+    sendCommand('*', {
+      type: 'command',
+      id: cmdId,
+      device_id: '*',
+      action: body.action,
+      payload: body.payload ?? {},
+    });
+    reply.code(202);
+    return { command_id: cmdId };
+  });
+}
+
+function parseView(row: any) {
+  return {
+    ...row,
+    widgets: JSON.parse(row.widgets ?? '[]'),
+    tags: JSON.parse(row.tags ?? '[]'),
+  };
+}
