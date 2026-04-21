@@ -8,7 +8,8 @@ RUN apk add --no-cache \
     python3 \
     make \
     g++ \
-    bash
+    bash \
+    jq
 
 # ── Build the server ──────────────────────────────────────────────────────────
 WORKDIR /app/server
