@@ -44,9 +44,11 @@ async function main() {
   // ── Start ─────────────────────────────────────────────────────────────────
   try {
     await app.listen({ port: config.port, host: config.host });
+    const host = config.host === '0.0.0.0' ? 'localhost' : config.host;
     console.log(`\n  Canvas UI Platform server`);
-    console.log(`  API   →  http://${config.host === '0.0.0.0' ? 'localhost' : config.host}:${config.port}/api`);
-    console.log(`  WS    →  ws://localhost:${config.port}/ws`);
+    console.log(`  Mode  →  ${config.isHaAddon ? 'HA add-on' : 'standalone'}`);
+    console.log(`  API   →  http://${host}:${config.port}/api`);
+    console.log(`  WS    →  ws://${host}:${config.port}/ws`);
     console.log(`  DB    →  ${config.dbPath}\n`);
   } catch (err) {
     app.log.error(err);
