@@ -25,8 +25,6 @@ RUN npm run build
 # Prune devDeps to shrink the image
 RUN npm prune --omit=dev
 
-# ── Add-on entrypoint ─────────────────────────────────────────────────────────
-COPY run.sh /run.sh
-RUN chmod +x /run.sh
-
-CMD ["/run.sh"]
+# ── Add-on entrypoint (s6 service) ───────────────────────────────────────────
+COPY run.sh /etc/services.d/canvas-ui/run
+RUN chmod +x /etc/services.d/canvas-ui/run
