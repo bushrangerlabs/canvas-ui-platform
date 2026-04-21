@@ -1,6 +1,9 @@
 # Canvas UI Platform
 
-A display management platform for smart homes and kiosk deployments.
+> [!WARNING]
+> **Work in progress — not ready for use.** This project is in early active development. There are no stable releases, the API will change without notice, and nothing is production-ready yet. Come back later.
+
+A standalone display management platform for smart homes and kiosk deployments.
 
 ## Repositories
 
