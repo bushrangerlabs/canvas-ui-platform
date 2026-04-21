@@ -3,15 +3,15 @@
 > [!WARNING]
 > **Work in progress — not ready for use.** This project is in early active development. There are no stable releases, the API will change without notice, and nothing is production-ready yet. Come back later.
 
-A standalone display management platform for smart homes and kiosk deployments.
+The next generation of Canvas UI — a fully standalone display management platform for smart homes and kiosk deployments. **This project replaces the [canvas-ui HACS integration](https://github.com/bushrangerlabs/canvas-ui).** It has everything canvas-ui has (the full drag-and-drop editor, all widgets, Home Assistant entity integration) plus a standalone server, multi-device management, and a native Tauri app for Linux and Android. No Home Assistant required to run it.
 
-## Repositories
+## Packages
 
 | Package | Description |
 |---|---|
-| `server/` | Node.js + SQLite backend — central config, real-time sync, device management |
-| `web/` | React web app — view editor and management UI |
-| `browser/` | Tauri native app — kiosk browser for Linux and Android |
+| `server/` | Node.js + SQLite backend — central config store, REST API, real-time WebSocket sync, device management |
+| `web/` | React SPA — the full drag-and-drop canvas editor, all widgets, HA data source config, device management UI |
+| `browser/` | Tauri native app — kiosk display client for Linux (AppImage) and Android (APK), connects to server for views and HA for live entity data |
 
 ## Architecture
 
