@@ -20,7 +20,7 @@ export async function viewRoutes(app: FastifyInstance) {
   // POST /api/views
   app.post<{ Body: any }>('/views', async (req, reply) => {
     const db = getDb();
-    const body = req.body as any;
+    const body = flattenBody(req.body as any);
     const id = body.id ?? nanoid(10);
     const now = new Date().toISOString();
     db.prepare(`
@@ -46,7 +46,7 @@ export async function viewRoutes(app: FastifyInstance) {
   // PUT /api/views/:id  (full replace)
   app.put<{ Params: { id: string }; Body: any }>('/views/:id', async (req, reply) => {
     const db = getDb();
-    const body = req.body as any;
+    const body = flattenBody(req.body as any);
     const existing = db.prepare('SELECT id FROM views WHERE id = ?').get(req.params.id);
     if (!existing) return reply.code(404).send({ error: 'View not found' });
     const now = new Date().toISOString();
@@ -71,7 +71,7 @@ export async function viewRoutes(app: FastifyInstance) {
   // PATCH /api/views/:id  (partial update)
   app.patch<{ Params: { id: string }; Body: any }>('/views/:id', async (req, reply) => {
     const db = getDb();
-    const body = req.body as any;
+    const body = flattenBody(req.body as any);
     const existing = db.prepare('SELECT * FROM views WHERE id = ?').get(req.params.id) as any;
     if (!existing) return reply.code(404).send({ error: 'View not found' });
     const now = new Date().toISOString();
@@ -119,9 +119,33 @@ export async function viewRoutes(app: FastifyInstance) {
 }
 
 function parseView(row: any) {
+  const widgets = JSON.parse(row.widgets ?? '[]');
+  const tags = JSON.parse(row.tags ?? '[]');
+  const view_data = {
+    id: row.id,
+    name: row.name,
+    sizex: row.width ?? 1920,
+    sizey: row.height ?? 1080,
+    style: {
+      backgroundColor: row.background ?? '#1a1a2e',
+      backgroundOpacity: 1,
+    },
+    widgets,
+  };
+  return { ...row, widgets, tags, view_data };
+}
+
+/** Unpack a view_data envelope if the client sent one */
+function flattenBody(body: any): any {
+  if (!body.view_data) return body;
+  const vd = body.view_data;
   return {
-    ...row,
-    widgets: JSON.parse(row.widgets ?? '[]'),
-    tags: JSON.parse(row.tags ?? '[]'),
+    ...body,
+    name: body.name ?? vd.name,
+    width: body.width ?? vd.sizex ?? 1920,
+    height: body.height ?? vd.sizey ?? 1080,
+    background: body.background ?? vd.style?.backgroundColor ?? null,
+    widgets: vd.widgets ?? body.widgets,
+    tags: vd.tags ?? body.tags,
   };
 }
