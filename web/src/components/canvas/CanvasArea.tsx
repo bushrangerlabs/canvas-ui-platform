@@ -53,12 +53,16 @@ export default function CanvasArea() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Auto-fit zoom when canvas or container size changes
-  useEffect(() => {
+  const activeViewRef = useRef(activeView);
+  activeViewRef.current = activeView;
+
+  const fitToContainer = useCallback(() => {
     const el = containerRef.current;
-    if (!el || !activeView) return;
+    const view = activeViewRef.current;
+    if (!el || !view) return;
     const { width, height } = el.getBoundingClientRect();
-    const szx = activeView.sizex ?? 1920;
-    const szy = activeView.sizey ?? 1080;
+    const szx = view.sizex ?? 1920;
+    const szy = view.sizey ?? 1080;
     const padding = 40;
     const fitZoom = Math.min(
       (width - padding * 2) / szx,
@@ -68,7 +72,21 @@ export default function CanvasArea() {
     const clamped = Math.max(MIN_ZOOM, parseFloat(fitZoom.toFixed(2)));
     setZoom(clamped);
     setPan({ x: padding, y: padding });
-  }, [activeView?.id]); // re-fit when switching views, not on every widget change
+  }, []); // stable — reads from refs
+
+  // Re-fit when view changes
+  useEffect(() => {
+    fitToContainer();
+  }, [activeView?.id, fitToContainer]);
+
+  // Re-fit when container resizes (sidebar collapse/expand)
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => fitToContainer());
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [fitToContainer]);
 
   const handleWheel = useCallback((e: WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {

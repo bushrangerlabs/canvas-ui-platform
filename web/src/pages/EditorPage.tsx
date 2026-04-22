@@ -8,7 +8,7 @@
  *   │  widget lib)│                      │                  │
  *   └─────────────┴──────────────────────┴─────────────────┘
  */
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Box } from '@mui/material';
 import { useEditorStore } from '../store';
 import EditorTopBar from '../components/editor/EditorTopBar';
@@ -18,6 +18,7 @@ import Inspector from '../components/inspector/Inspector';
 
 export default function EditorPage() {
   const { loadViews } = useEditorStore();
+  const [sidebarOpen, setSidebarOpen] = useState(true);
 
   useEffect(() => {
     loadViews();
@@ -25,9 +26,9 @@ export default function EditorPage() {
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden' }}>
-      <EditorTopBar />
+      <EditorTopBar sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((v) => !v)} />
       <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <EditorSidebar />
+        {sidebarOpen && <EditorSidebar />}
         <CanvasArea />
         <Inspector />
       </Box>

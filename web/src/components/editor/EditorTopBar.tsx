@@ -2,9 +2,16 @@ import { Box, AppBar, Toolbar, Typography, Button, Chip, IconButton, Tooltip } f
 import SaveIcon from '@mui/icons-material/Save';
 import UndoIcon from '@mui/icons-material/Undo';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import MenuIcon from '@mui/icons-material/Menu';
+import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import { useEditorStore } from '../../store';
 
-export default function EditorTopBar() {
+interface Props {
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+}
+
+export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
   const { activeView, isDirty, saveActiveView } = useEditorStore();
 
   return (
@@ -14,6 +21,11 @@ export default function EditorTopBar() {
       sx={{ bgcolor: 'background.paper', borderBottom: 1, borderColor: 'divider' }}
     >
       <Toolbar variant="dense" sx={{ gap: 1 }}>
+        <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'}>
+          <IconButton size="small" onClick={onToggleSidebar} sx={{ mr: 0.5 }}>
+            {sidebarOpen ? <MenuOpenIcon fontSize="small" /> : <MenuIcon fontSize="small" />}
+          </IconButton>
+        </Tooltip>
         <Typography variant="h6" component="div" sx={{ color: 'primary.main', fontWeight: 700, mr: 2 }}>
           Canvas UI
         </Typography>
