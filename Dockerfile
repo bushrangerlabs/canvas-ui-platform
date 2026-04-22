@@ -8,19 +8,6 @@ FROM node:20-alpine
 
 RUN apk add --no-cache python3 make g++ jq bash
 
-# ── Build the web editor SPA ─────────────────────────────────────────────────
-WORKDIR /app/web
-COPY web/package*.json ./
-RUN npm ci
-
-COPY web/tsconfig*.json ./
-COPY web/vite.config.ts ./
-COPY web/src ./src
-COPY web/public ./public
-COPY web/index.html ./
-# Build into server/public/ (relative path from web/)
-RUN npm run build && rm -rf node_modules
-
 # ── Build the server ─────────────────────────────────────────────────────────
 WORKDIR /app/server
 COPY server/package*.json ./
@@ -28,7 +15,7 @@ RUN npm ci
 
 COPY server/tsconfig.json ./
 COPY server/src ./src
-# Include the web build output that landed in server/public/
+# Pre-built web SPA assets (built locally and committed to repo)
 COPY server/public ./public
 RUN npm run build && npm prune --omit=dev
 
