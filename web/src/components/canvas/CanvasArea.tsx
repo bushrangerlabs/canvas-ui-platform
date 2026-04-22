@@ -71,7 +71,13 @@ export default function CanvasArea() {
     );
     const clamped = Math.max(MIN_ZOOM, parseFloat(fitZoom.toFixed(2)));
     setZoom(clamped);
-    setPan({ x: padding, y: padding });
+    // Centre the scaled view; fall back to padding if it overflows
+    const scaledW = szx * clamped;
+    const scaledH = szy * clamped;
+    setPan({
+      x: Math.max(padding, (width - scaledW) / 2),
+      y: Math.max(padding, (height - scaledH) / 2),
+    });
   }, []); // stable — reads from refs
 
   // Re-fit when view changes
