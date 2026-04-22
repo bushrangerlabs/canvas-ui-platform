@@ -3,6 +3,7 @@
  */
 import React from 'react';
 import { useHAEntities } from '../../context/HAEntitiesContext';
+import { useVisibility } from '../../hooks/useVisibility';
 import type { WidgetProps } from '../../types';
 import type { WidgetMetadata } from './metadata';
 
@@ -53,6 +54,9 @@ const WeatherWidget: React.FC<WidgetProps> = ({ config }) => {
   const { getEntity } = useHAEntities();
   const entity = entity_id ? getEntity(entity_id) : null;
   const attrs = entity?.attributes ?? {};
+  const isVisible = useVisibility(config.config.visibilityCondition);
+
+  if (!isVisible) return null;
 
   const condition = entity?.state ?? 'sunny';
   const temp = attrs.temperature ?? '--';

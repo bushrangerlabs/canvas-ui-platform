@@ -3,6 +3,7 @@
  */
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import { useEditorStore } from '../../store';
 import WidgetRenderer from '../widgets/WidgetRenderer';
 import type { WidgetConfig } from '../../types';
@@ -265,6 +266,18 @@ export default function CanvasArea() {
                 }}
               >
                 <WidgetRenderer config={w} isEditMode={true} />
+
+                {/* hiddenInEdit overlay */}
+                {w.hiddenInEdit && (
+                  <div style={{
+                    position: 'absolute', inset: 0,
+                    background: 'rgba(0,0,0,0.55)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    pointerEvents: 'none',
+                  }}>
+                    <VisibilityOffIcon sx={{ color: 'rgba(255,255,255,0.75)', fontSize: 20 }} />
+                  </div>
+                )}
 
                 {/* Resize handles — only on selected widget */}
                 {selected && HANDLE_DEFS.map(({ handle, cursor, style: hs }) => (

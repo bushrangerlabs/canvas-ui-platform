@@ -5,6 +5,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import { Dialog, IconButton } from '@mui/material';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useHAEntities } from '../../context/HAEntitiesContext';
+import { useVisibility } from '../../hooks/useVisibility';
 import type { WidgetProps } from '../../types';
 import type { WidgetMetadata } from './metadata';
 
@@ -74,6 +75,7 @@ const ColorPickerWidget: React.FC<WidgetProps> = ({ config }) => {
 
   const { getEntity } = useHAEntities();
   const entity = entity_id ? getEntity(entity_id) : null;
+  const isVisible = useVisibility(config.config.visibilityCondition);
 
   // Derive initial color from entity
   const getEntityColor = (): string | null => {
@@ -162,6 +164,8 @@ const ColorPickerWidget: React.FC<WidgetProps> = ({ config }) => {
       applyHsv(newH, newS, brightness);
     }
   };
+
+  if (!isVisible) return null;
 
   return (
     <>

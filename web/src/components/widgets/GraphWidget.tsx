@@ -5,6 +5,7 @@ import { BarChart } from '@mui/x-charts/BarChart';
 import { LineChart } from '@mui/x-charts/LineChart';
 import React, { useEffect, useState } from 'react';
 import { useHAEntities } from '../../context/HAEntitiesContext';
+import { useVisibility } from '../../hooks/useVisibility';
 import type { WidgetProps } from '../../types';
 import type { WidgetMetadata } from './metadata';
 
@@ -50,6 +51,7 @@ const GraphWidget: React.FC<WidgetProps> = ({ config }) => {
   const { getEntity } = useHAEntities();
   const entity = entity_id ? getEntity(entity_id) : null;
   const currentValue = entity ? parseFloat(entity.state) : NaN;
+  const isVisible = useVisibility(config.config.visibilityCondition);
 
   const [history, setHistory] = useState<number[]>([]);
 
@@ -76,6 +78,8 @@ const GraphWidget: React.FC<WidgetProps> = ({ config }) => {
   const h = (config.position.height ?? 250) - 16;
 
   const empty = history.length === 0;
+
+  if (!isVisible) return null;
 
   return (
     <div style={{

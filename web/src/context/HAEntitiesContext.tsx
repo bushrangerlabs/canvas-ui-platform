@@ -1,10 +1,12 @@
 /**
  * HAEntitiesContext — provides live HA entity states to the whole app.
- * Polls /api/ha/states every 30 s and exposes a getState() helper.
+ * Subscribes to the platform WebSocket for real-time ha_state_update pushes.
+ * Falls back to polling /api/ha/states every 60 s when WS is unavailable.
  */
 import { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 import type { ReactNode } from 'react';
 import { api } from '../api/client';
+import { usePlatformWS } from '../hooks/usePlatformWS';
 
 export interface HAEntityState {
   entity_id: string;
@@ -36,7 +38,7 @@ export function useHAEntities() {
   return useContext(HAEntitiesContext);
 }
 
-const POLL_INTERVAL_MS = 30_000;
+const POLL_INTERVAL_MS = 60_000;
 
 export function HAEntitiesProvider({ children }: { children: ReactNode }) {
   const [entities, setEntities] = useState<Record<string, HAEntityState>>({});
@@ -64,6 +66,23 @@ export function HAEntitiesProvider({ children }: { children: ReactNode }) {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [fetchStates]);
+
+  // Real-time updates from the platform WS server
+  const handleWsMessage = useCallback((msg: any) => {
+    if (msg.type === 'ha_state_update') {
+      setEntities((prev) => ({
+        ...prev,
+        [msg.entity_id]: {
+          entity_id: msg.entity_id,
+          state: msg.state,
+          attributes: msg.attributes ?? {},
+          last_updated: msg.last_updated ?? new Date().toISOString(),
+          last_changed: msg.last_changed ?? new Date().toISOString(),
+        },
+      }));
+    }
+  }, []);
+  usePlatformWS(handleWsMessage);
 
   const getState = useCallback(
     (entityId: string) => entities[entityId]?.state ?? null,

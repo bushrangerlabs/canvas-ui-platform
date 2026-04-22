@@ -6,7 +6,7 @@ import staticFiles from '@fastify/static';
 import path from 'path';
 import { config } from './config';
 import { initDb } from './db/index';
-import { initWss } from './ws/index';
+import { initWss, startHAStatePoller } from './ws/index';
 import { viewRoutes } from './routes/views';
 import { deviceRoutes } from './routes/devices';
 import { dataSourceRoutes } from './routes/datasources';
@@ -68,6 +68,7 @@ async function main() {
   // ── HTTP server + WebSocket ───────────────────────────────────────────────
   await app.ready();
   initWss(app.server);
+  startHAStatePoller();
 
   // ── Start ─────────────────────────────────────────────────────────────────
   try {

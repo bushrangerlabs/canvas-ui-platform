@@ -4,6 +4,45 @@ import { getDb } from '../db/index';
 
 export type ClientType = 'browser' | 'editor' | 'api';
 
+// ─── HA state broadcaster ────────────────────────────────────────────────────
+const SUPERVISOR_TOKEN = process.env.SUPERVISOR_TOKEN;
+const HA_API = 'http://supervisor/core/api';
+const HA_POLL_MS = 10_000;
+let _prevStates: Record<string, string> = {};
+
+async function pollAndBroadcastHAStates() {
+  if (!SUPERVISOR_TOKEN) return;
+  try {
+    const res = await fetch(`${HA_API}/states`, {
+      headers: { Authorization: `Bearer ${SUPERVISOR_TOKEN}` },
+    });
+    if (!res.ok) return;
+    const states: Array<{ entity_id: string; state: string; attributes: Record<string, unknown>; last_updated?: string; last_changed?: string }> = await res.json();
+    for (const entity of states) {
+      if (_prevStates[entity.entity_id] !== entity.state) {
+        _prevStates[entity.entity_id] = entity.state;
+        broadcast({
+          type: 'ha_state_update',
+          entity_id: entity.entity_id,
+          state: entity.state,
+          attributes: entity.attributes,
+          last_updated: entity.last_updated,
+          last_changed: entity.last_changed,
+        }, 'all');
+      }
+    }
+  } catch {
+    // Silently fail — HA may not be available
+  }
+}
+
+/** Start the periodic HA state poller. Call once after initWss(). */
+export function startHAStatePoller() {
+  if (!SUPERVISOR_TOKEN) return; // skip when running outside an add-on
+  pollAndBroadcastHAStates(); // immediate first fetch
+  setInterval(pollAndBroadcastHAStates, HA_POLL_MS);
+}
+
 interface ConnectedClient {
   ws: WebSocket;
   clientType: ClientType;

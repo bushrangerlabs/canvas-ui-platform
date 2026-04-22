@@ -4,6 +4,7 @@
 import { FormControl, FormControlLabel, Radio, RadioGroup } from '@mui/material';
 import React from 'react';
 import { useHAEntities } from '../../context/HAEntitiesContext';
+import { useVisibility } from '../../hooks/useVisibility';
 import type { WidgetProps } from '../../types';
 import type { WidgetMetadata } from './metadata';
 
@@ -42,6 +43,7 @@ const RadioButtonWidget: React.FC<WidgetProps> = ({ config }) => {
 
   const { getEntity } = useHAEntities();
   const entity = entity_id ? getEntity(entity_id) : null;
+  const isVisible = useVisibility(config.config.visibilityCondition);
 
   const optionsList = options.split(',').map((o: string) => o.trim());
   const valuesList = values ? values.split(',').map((v: string) => v.trim()) : optionsList;
@@ -63,6 +65,8 @@ const RadioButtonWidget: React.FC<WidgetProps> = ({ config }) => {
       console.warn('[RadioButtonWidget] Service call failed:', e);
     }
   };
+
+  if (!isVisible) return null;
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'flex-start',

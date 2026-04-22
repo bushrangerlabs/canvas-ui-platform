@@ -9,6 +9,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { WidgetProps } from '../../types';
 import type { WidgetMetadata } from './metadata';
+import { useVisibility } from '../../hooks/useVisibility';
 
 // ─── Tick mark helpers ──────────────────────────────────────────────────────
 
@@ -499,6 +500,8 @@ const AnalogClockWidget: React.FC<WidgetProps> = ({ config }) => {
   const [minuteAngle, setMinuteAngle] = useState(0);
   const [secondAngle, setSecondAngle] = useState(0);
 
+  const isVisible = useVisibility(config.config.visibilityCondition);
+
   const behaviorRef = useRef({ secondHandBehavior, minuteHandBehavior, secondHandStopTime });
   behaviorRef.current = { secondHandBehavior, minuteHandBehavior, secondHandStopTime };
 
@@ -548,6 +551,8 @@ const AnalogClockWidget: React.FC<WidgetProps> = ({ config }) => {
   // Shadow transform helper
   const shadowTransform = (scale: number) =>
     `translate(${shadowOffsetX * scale}, ${shadowOffsetY * scale})`;
+
+  if (!isVisible) return null;
 
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative', boxSizing: 'border-box' }}>

@@ -137,6 +137,7 @@ export type WsInboundMessage =
   | { type: 'hello_ack'; server_version: string }
   | { type: 'view_change'; viewId: string; viewData: ViewConfig }
   | { type: 'data_update'; sourceId: string; key: string; value: any; unit?: string }
+  | { type: 'ha_state_update'; entity_id: string; state: string; attributes: Record<string, any>; last_updated?: string; last_changed?: string }
   | { type: 'command'; id: number; device_id: string; action: string; payload: Record<string, any> }
   | { type: 'pong' };
 

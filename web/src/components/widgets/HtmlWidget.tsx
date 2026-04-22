@@ -8,6 +8,7 @@ import type { WidgetProps } from '../../types';
 import type { WidgetMetadata } from './metadata';
 import { applyUniversalStyles } from '../utils/styleBuilder';
 import { useResolvedUniversalStyle } from '../../hooks/useResolvedUniversalStyle';
+import { useVisibility } from '../../hooks/useVisibility';
 
 const HtmlWidget: React.FC<WidgetProps> = ({ config }) => {
   // Phase 44: Config destructuring with defaults
@@ -20,6 +21,7 @@ const HtmlWidget: React.FC<WidgetProps> = ({ config }) => {
 
   const universalStyle = useResolvedUniversalStyle(config.config.style || config.config as any);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isVisible = useVisibility(config.config.visibilityCondition);
 
   // Get HTML from entity attribute, entity state, or static config
   const getHtml = (): string => {
@@ -44,6 +46,8 @@ const HtmlWidget: React.FC<WidgetProps> = ({ config }) => {
     boxSizing: 'border-box',
   };
   const finalStyle = applyUniversalStyles(universalStyle, baseStyle);
+
+  if (!isVisible) return null;
 
   return (
     <div

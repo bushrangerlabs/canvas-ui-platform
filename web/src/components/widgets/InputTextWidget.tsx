@@ -3,6 +3,7 @@
  */
 import React, { useState, useEffect } from 'react';
 import { useHAEntities } from '../../context/HAEntitiesContext';
+import { useVisibility } from '../../hooks/useVisibility';
 import type { WidgetProps } from '../../types';
 import type { WidgetMetadata } from './metadata';
 
@@ -41,6 +42,7 @@ const InputTextWidget: React.FC<WidgetProps> = ({ config }) => {
   const { getEntity } = useHAEntities();
   const entity = entity_id ? getEntity(entity_id) : null;
   const entityValue = entity?.state ?? '';
+  const isVisible = useVisibility(config.config.visibilityCondition);
 
   const [value, setValue] = useState(entityValue);
 
@@ -65,6 +67,8 @@ const InputTextWidget: React.FC<WidgetProps> = ({ config }) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') { handleBlur(); (e.target as HTMLInputElement).blur(); }
   };
+
+  if (!isVisible) return null;
 
   return (
     <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', gap: 4 }}>
