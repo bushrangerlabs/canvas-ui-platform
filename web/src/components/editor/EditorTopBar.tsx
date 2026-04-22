@@ -1,11 +1,13 @@
 import { Box, AppBar, Toolbar, Typography, Button, Chip, IconButton, Tooltip } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import UndoIcon from '@mui/icons-material/Undo';
+import RedoIcon from '@mui/icons-material/Redo';
 import GridOnIcon from '@mui/icons-material/GridOn';
 import GridOffIcon from '@mui/icons-material/GridOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
+import { useEffect } from 'react';
 import { useEditorStore } from '../../store';
 
 interface Props {
@@ -14,7 +16,20 @@ interface Props {
 }
 
 export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
-  const { activeView, isDirty, saveActiveView, snapEnabled, toggleSnap } = useEditorStore();
+  const { activeView, isDirty, saveActiveView, snapEnabled, toggleSnap, _past, _future, undo, redo } = useEditorStore();
+  const canUndo = _past.length > 0;
+  const canRedo = _future.length > 0;
+
+  // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      if (e.key === 'z' && !e.shiftKey) { e.preventDefault(); undo(); }
+      if ((e.key === 'z' && e.shiftKey) || e.key === 'y') { e.preventDefault(); redo(); }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [undo, redo]);
 
   return (
     <AppBar
@@ -63,10 +78,18 @@ export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
           </IconButton>
         </Tooltip>
 
-        <Tooltip title="Undo (coming soon)">
+        <Tooltip title="Undo (Ctrl+Z)">
           <span>
-            <IconButton size="small" disabled>
+            <IconButton size="small" disabled={!canUndo} onClick={undo}>
               <UndoIcon fontSize="small" />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        <Tooltip title="Redo (Ctrl+Shift+Z)">
+          <span>
+            <IconButton size="small" disabled={!canRedo} onClick={redo}>
+              <RedoIcon fontSize="small" />
             </IconButton>
           </span>
         </Tooltip>

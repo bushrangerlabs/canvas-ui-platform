@@ -20,6 +20,13 @@ interface EditorState {
   // ── selection state ──────────────────────────────────────────────────────
   selectedWidgetId: string | null;
 
+  // ── undo / redo ───────────────────────────────────────────────────────────
+  _past: ViewConfig[];
+  _future: ViewConfig[];
+  pushHistorySnapshot: () => void;
+  undo: () => void;
+  redo: () => void;
+
   // ── snap-to-grid ─────────────────────────────────────────────────────────
   snapEnabled: boolean;
   snapSize: number;
@@ -71,6 +78,41 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeView: null,
   isDirty: false,
   selectedWidgetId: null,
+  _past: [],
+  _future: [],
+
+  pushHistorySnapshot: () => {
+    const av = get().activeView;
+    if (!av) return;
+    set((s) => ({ _past: [...s._past.slice(-49), structuredClone(av)], _future: [] }));
+  },
+
+  undo: () => {
+    set((s) => {
+      if (!s._past.length || !s.activeView) return s;
+      const prev = s._past[s._past.length - 1];
+      return {
+        _past: s._past.slice(0, -1),
+        _future: [structuredClone(s.activeView), ...s._future.slice(0, 49)],
+        activeView: prev,
+        isDirty: true,
+      };
+    });
+  },
+
+  redo: () => {
+    set((s) => {
+      if (!s._future.length || !s.activeView) return s;
+      const next = s._future[0];
+      return {
+        _future: s._future.slice(1),
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)],
+        activeView: next,
+        isDirty: true,
+      };
+    });
+  },
+
   snapEnabled: false,
   snapSize: 10,
   toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled })),
@@ -93,6 +135,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeView: structuredClone(existing.view_data),
         isDirty: false,
         selectedWidgetId: null,
+        _past: [],
+        _future: [],
       });
       return;
     }
@@ -102,6 +146,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeView: structuredClone(sv.view_data),
       isDirty: false,
       selectedWidgetId: null,
+      _past: [],
+      _future: [],
     });
   },
 
@@ -147,6 +193,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => {
       if (!s.activeView) return s;
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)],
+        _future: [],
         activeView: { ...s.activeView, style: { ...s.activeView.style, ...style } },
         isDirty: true,
       };
@@ -156,14 +204,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateViewName: (name) => {
     set((s) => {
       if (!s.activeView) return s;
-      return { activeView: { ...s.activeView, name }, isDirty: true };
+      return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)],
+        _future: [],
+        activeView: { ...s.activeView, name },
+        isDirty: true,
+      };
     });
   },
 
   updateViewSize: (w, h) => {
     set((s) => {
       if (!s.activeView) return s;
-      return { activeView: { ...s.activeView, sizex: w, sizey: h }, isDirty: true };
+      return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)],
+        _future: [],
+        activeView: { ...s.activeView, sizex: w, sizey: h },
+        isDirty: true,
+      };
     });
   },
 
@@ -173,6 +231,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => {
       if (!s.activeView) return s;
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)],
+        _future: [],
         activeView: {
           ...s.activeView,
           widgets: [...s.activeView.widgets, w],
@@ -203,6 +263,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => {
       if (!s.activeView) return s;
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)],
+        _future: [],
         activeView: {
           ...s.activeView,
           widgets: s.activeView.widgets.filter((w) => w.id !== id),
@@ -228,6 +290,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         },
       };
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)],
+        _future: [],
         activeView: {
           ...s.activeView,
           widgets: [...s.activeView.widgets, copy],
@@ -246,6 +310,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!s.activeView) return s;
       const maxZ = Math.max(0, ...s.activeView.widgets.map((w) => w.position.zIndex ?? 1));
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)], _future: [],
         activeView: {
           ...s.activeView,
           widgets: s.activeView.widgets.map((w) =>
@@ -262,6 +327,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!s.activeView) return s;
       const minZ = Math.min(1, ...s.activeView.widgets.map((w) => w.position.zIndex ?? 1));
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)], _future: [],
         activeView: {
           ...s.activeView,
           widgets: s.activeView.widgets.map((w) =>
@@ -277,6 +343,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => {
       if (!s.activeView) return s;
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)], _future: [],
         activeView: {
           ...s.activeView,
           widgets: s.activeView.widgets.map((w) =>
@@ -292,6 +359,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => {
       if (!s.activeView) return s;
       return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView)], _future: [],
         activeView: {
           ...s.activeView,
           widgets: s.activeView.widgets.map((w) =>

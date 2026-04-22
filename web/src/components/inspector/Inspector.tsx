@@ -259,6 +259,35 @@ function WidgetTab() {
           </Accordion>
         );
       })}
+
+      {/* Visibility / show-hide accordion */}
+      <Accordion disableGutters square elevation={0}
+        sx={{ borderBottom: 1, borderColor: 'divider', '&::before': { display: 'none' } }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}
+          sx={{ minHeight: 36, '& .MuiAccordionSummary-content': { my: 0.5 } }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5 }}>VISIBILITY</Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 1.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <TextField
+              size="small" fullWidth
+              label="Show when (condition)"
+              placeholder="e.g. entity.state == 'on'"
+              value={widget.config.visibilityCondition ?? ''}
+              onChange={(e) => setConfig('visibilityCondition', e.target.value || undefined)}
+              helperText="Leave blank to always show"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox size="small"
+                  checked={Boolean(widget.hiddenInEdit)}
+                  onChange={(e) => updateWidget(widget.id, { hiddenInEdit: e.target.checked })} />
+              }
+              label={<Typography variant="caption">Hide in edit mode</Typography>}
+            />
+          </Box>
+        </AccordionDetails>
+      </Accordion>
     </>
   );
 }

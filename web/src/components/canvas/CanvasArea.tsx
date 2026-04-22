@@ -44,7 +44,7 @@ const HANDLE_DEFS: { handle: ResizeHandle; cursor: string; style: React.CSSPrope
 ];
 
 export default function CanvasArea() {
-  const { activeView, selectedWidgetId, selectWidget, updateWidget, snapEnabled, snapSize } = useEditorStore();
+  const { activeView, selectedWidgetId, selectWidget, updateWidget, snapEnabled, snapSize, pushHistorySnapshot } = useEditorStore();
   const snap = (v: number) => snapEnabled ? Math.round(v / snapSize) * snapSize : Math.round(v);
   const [zoom, setZoom] = useState(0.5);
   const [pan, setPan] = useState({ x: 20, y: 20 });
@@ -113,6 +113,7 @@ export default function CanvasArea() {
   const onWidgetMouseDown = (e: React.MouseEvent, widget: WidgetConfig) => {
     e.stopPropagation();
     selectWidget(widget.id);
+    pushHistorySnapshot();
     dragRef.current = {
       widgetId: widget.id,
       startX: e.clientX,
@@ -126,6 +127,7 @@ export default function CanvasArea() {
   const onResizeMouseDown = (e: React.MouseEvent, widget: WidgetConfig, handle: ResizeHandle) => {
     e.stopPropagation();
     e.preventDefault();
+    pushHistorySnapshot();
     resizeRef.current = {
       widgetId: widget.id,
       handle,
