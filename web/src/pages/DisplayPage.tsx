@@ -3,12 +3,12 @@
  * Connects via WebSocket and renders the assigned view full-screen.
  * URL: /display?device=<deviceId>
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Box, Typography } from '@mui/material';
 import { usePlatformWS } from '../hooks/usePlatformWS';
 import CanvasRenderer from '../components/canvas/CanvasRenderer';
-import type { ViewConfig, WsInboundMessage } from '../types';
+import type { ViewConfig, WsInboundMessage, WsOutboundMessage } from '../types';
 
 export default function DisplayPage() {
   const [searchParams] = useSearchParams();
@@ -17,9 +17,12 @@ export default function DisplayPage() {
   const [view, setView] = useState<ViewConfig | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
 
+  // Deferred send ref so onOpen can call it before send is in scope
+  const sendRef = useRef<((msg: WsOutboundMessage) => void) | null>(null);
+
   const onMessage = useCallback((msg: WsInboundMessage) => {
     switch (msg.type) {
-      case 'connected':
+      case 'hello_ack':
         setStatus('connected');
         break;
       case 'view_change':
@@ -28,14 +31,12 @@ export default function DisplayPage() {
     }
   }, []);
 
-  const { send } = usePlatformWS(onMessage, true);
+  const onOpen = useCallback(() => {
+    sendRef.current?.({ type: 'hello', client_type: 'browser', device_id: deviceId });
+  }, [deviceId]);
 
-  // Register device on connect
-  const handleConnected = useCallback(() => {
-    send({ type: 'register', deviceId });
-  }, [send, deviceId]);
-
-  void handleConnected; // registered via onMessage → connected
+  const { send } = usePlatformWS(onMessage, true, onOpen);
+  sendRef.current = send;
 
   return (
     <Box

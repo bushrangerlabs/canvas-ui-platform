@@ -6,6 +6,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import type { WsInboundMessage, WsOutboundMessage } from '../types';
 
 type MessageHandler = (msg: WsInboundMessage) => void;
+type OpenHandler = () => void;
 
 const WS_URL = (() => {
   if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
@@ -17,11 +18,13 @@ const WS_URL = (() => {
 
 const RECONNECT_DELAY = 3000;
 
-export function usePlatformWS(onMessage: MessageHandler, enabled = true) {
+export function usePlatformWS(onMessage: MessageHandler, enabled = true, onOpen?: OpenHandler) {
   const wsRef = useRef<WebSocket | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onMessageRef = useRef<MessageHandler>(onMessage);
+  const onOpenRef = useRef<OpenHandler | undefined>(onOpen);
   onMessageRef.current = onMessage;
+  onOpenRef.current = onOpen;
 
   const send = useCallback((msg: WsOutboundMessage) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -40,6 +43,7 @@ export function usePlatformWS(onMessage: MessageHandler, enabled = true) {
 
       ws.onopen = () => {
         console.debug('[WS] connected');
+        onOpenRef.current?.();
       };
 
       ws.onmessage = (ev) => {

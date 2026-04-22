@@ -134,12 +134,13 @@ export interface Device {
 // ── WebSocket messages ────────────────────────────────────────────────────────
 
 export type WsInboundMessage =
-  | { type: 'connected'; clientId: string }
+  | { type: 'hello_ack'; server_version: string }
   | { type: 'view_change'; viewId: string; viewData: ViewConfig }
   | { type: 'data_update'; sourceId: string; key: string; value: any; unit?: string }
+  | { type: 'command'; id: number; device_id: string; action: string; payload: Record<string, any> }
   | { type: 'pong' };
 
 export type WsOutboundMessage =
   | { type: 'ping' }
-  | { type: 'register'; deviceId: string }
+  | { type: 'hello'; client_type: 'browser' | 'editor' | 'api'; device_id?: string }
   | { type: 'subscribe_view'; viewId: string };

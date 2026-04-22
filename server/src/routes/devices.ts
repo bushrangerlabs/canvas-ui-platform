@@ -68,6 +68,15 @@ export async function deviceRoutes(app: FastifyInstance) {
     if (fields.length) {
       vals.push(req.params.id);
       db.prepare(`UPDATE devices SET ${fields.join(', ')} WHERE id=?`).run(...vals);
+
+      // Push the new view to the device immediately if default_view_id changed
+      if (body.default_view_id) {
+        const row = db.prepare('SELECT * FROM views WHERE id = ?').get(body.default_view_id) as any;
+        if (row) {
+          const viewData = { ...row, widgets: JSON.parse(row.widgets ?? '[]'), tags: JSON.parse(row.tags ?? '[]') };
+          sendCommand(req.params.id, { type: 'view_change', viewId: row.id, viewData });
+        }
+      }
     }
     return db.prepare('SELECT * FROM devices WHERE id = ?').get(req.params.id);
   });

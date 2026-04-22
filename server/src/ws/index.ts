@@ -1,5 +1,6 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import { IncomingMessage } from 'http';
+import { getDb } from '../db/index';
 
 export type ClientType = 'browser' | 'editor' | 'api';
 
@@ -74,6 +75,23 @@ function handleMessage(ws: WebSocket, msg: any): void {
       client.deviceId = msg.device_id;
       console.log(`[ws] Hello from ${client.clientType}${client.deviceId ? ` (${client.deviceId})` : ''}`);
       send(ws, { type: 'hello_ack', server_version: '0.1.0' });
+
+      // For browser clients, push their assigned view immediately
+      if (client.clientType === 'browser' && client.deviceId) {
+        try {
+          const db = getDb();
+          const device = db.prepare('SELECT default_view_id FROM devices WHERE id = ?').get(client.deviceId) as any;
+          if (device?.default_view_id) {
+            const row = db.prepare('SELECT * FROM views WHERE id = ?').get(device.default_view_id) as any;
+            if (row) {
+              const viewData = { ...row, widgets: JSON.parse(row.widgets ?? '[]'), tags: JSON.parse(row.tags ?? '[]') };
+              send(ws, { type: 'view_change', viewId: row.id, viewData });
+            }
+          }
+        } catch (err) {
+          console.warn('[ws] Failed to push initial view:', err);
+        }
+      }
       break;
     }
 
