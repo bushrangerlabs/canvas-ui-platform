@@ -14,10 +14,10 @@ OPTIONS=/data/options.json
 
 if [[ -f "${OPTIONS}" ]]; then
     JWT_SECRET=$(jq -r '.jwt_secret // ""' "${OPTIONS}")
-    LOG_LEVEL=$(jq -r '.log_level // "info"' "${OPTIONS}")
+    LOG_LEVEL=$(jq -r '.log_level // "warn"' "${OPTIONS}")
 else
     JWT_SECRET=""
-    LOG_LEVEL="info"
+    LOG_LEVEL="warn"
 fi
 
 # Auto-generate a JWT secret if not set
