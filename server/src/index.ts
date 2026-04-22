@@ -19,7 +19,10 @@ async function main() {
   initDb();
 
   // ── Fastify ───────────────────────────────────────────────────────────────
-  const app = Fastify({ logger: { level: 'info' } });
+  const app = Fastify({
+    logger: { level: process.env.LOG_LEVEL ?? 'warn' },
+    ignoreTrailingSlash: true,
+  });
 
   await app.register(cors, { origin: config.corsOrigins });
   await app.register(jwt, { secret: config.jwtSecret });
