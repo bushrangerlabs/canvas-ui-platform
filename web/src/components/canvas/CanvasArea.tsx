@@ -45,12 +45,30 @@ const HANDLE_DEFS: { handle: ResizeHandle; cursor: string; style: React.CSSPrope
 
 export default function CanvasArea() {
   const { activeView, selectedWidgetId, selectWidget, updateWidget } = useEditorStore();
-  const [zoom, setZoom] = useState(0.7);
-  const [pan, setPan] = useState({ x: 40, y: 40 });
+  const [zoom, setZoom] = useState(0.5);
+  const [pan, setPan] = useState({ x: 20, y: 20 });
   const dragRef = useRef<DragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
   const panDragRef = useRef<{ startX: number; startY: number; origPan: { x: number; y: number } } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Auto-fit zoom when canvas or container size changes
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el || !activeView) return;
+    const { width, height } = el.getBoundingClientRect();
+    const szx = activeView.sizex ?? 1920;
+    const szy = activeView.sizey ?? 1080;
+    const padding = 40;
+    const fitZoom = Math.min(
+      (width - padding * 2) / szx,
+      (height - padding * 2) / szy,
+      MAX_ZOOM
+    );
+    const clamped = Math.max(MIN_ZOOM, parseFloat(fitZoom.toFixed(2)));
+    setZoom(clamped);
+    setPan({ x: padding, y: padding });
+  }, [activeView?.id]); // re-fit when switching views, not on every widget change
 
   const handleWheel = useCallback((e: WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {

@@ -20,24 +20,7 @@ export default function Inspector() {
   const meta = widget ? WIDGET_REGISTRY[widget.type] : undefined;
 
   if (!widget || !meta) {
-    return (
-      <Box
-        sx={{
-          width: 280,
-          flexShrink: 0,
-          bgcolor: 'background.paper',
-          borderLeft: 1,
-          borderColor: 'divider',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Typography variant="caption" color="text.secondary" sx={{ p: 2, textAlign: 'center' }}>
-          Select a widget to inspect its properties.
-        </Typography>
-      </Box>
-    );
+    return null;
   }
 
   function setConfig(key: string, value: any) {
