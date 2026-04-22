@@ -163,7 +163,7 @@ export default function CanvasArea() {
     );
   }
 
-  const { sizex = 1920, sizey = 1080, style, widgets } = activeView;
+  const { sizex = 1920, sizey = 1080, style = { backgroundColor: '#1a1a2e', backgroundOpacity: 1 }, widgets = [] } = activeView;
 
   return (
     <Box

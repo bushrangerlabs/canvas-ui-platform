@@ -1,8 +1,31 @@
 /**
  * WidgetRenderer — lazy-loads the correct widget component by type.
  */
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, Component } from 'react';
 import type { WidgetProps } from '../../types';
+import type { ErrorInfo, ReactNode } from 'react';
+
+class WidgetErrorBoundary extends Component<{ children: ReactNode; type: string }, { error: Error | null }> {
+  state = { error: null };
+  static getDerivedStateFromError(error: Error) { return { error }; }
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    console.error(`[WidgetRenderer] Widget "${this.props.type}" crashed:`, error, info);
+  }
+  render() {
+    if (this.state.error) {
+      return (
+        <div style={{
+          width: '100%', height: '100%', display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          background: '#2a1a1a', color: '#ff6b6b', fontSize: 11, fontFamily: 'monospace', padding: 4,
+        }}>
+          ⚠ {this.props.type}
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 const widgetMap: Record<string, React.LazyExoticComponent<React.FC<WidgetProps>>> = {
   // Display
@@ -54,8 +77,10 @@ export default function WidgetRenderer(props: WidgetProps) {
   }
 
   return (
-    <Suspense fallback={<div style={{ width: '100%', height: '100%', background: '#1a1a2e' }} />}>
-      <Component {...props} />
-    </Suspense>
+    <WidgetErrorBoundary type={props.config.type}>
+      <Suspense fallback={<div style={{ width: '100%', height: '100%', background: '#1a1a2e' }} />}>
+        <Component {...props} />
+      </Suspense>
+    </WidgetErrorBoundary>
   );
 }
