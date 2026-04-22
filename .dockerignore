@@ -13,6 +13,4 @@ server/data/
 server/*.db
 server/*.db-shm
 server/*.db-wal
-# The web build output that lives in server/public/
-# is rebuilt in Docker — don't send local copy
-server/public/
+# server/public/ is pre-built locally and must be included in the Docker context

@@ -37,6 +37,7 @@ async function main() {
   await app.register(staticFiles, {
     root: webRoot,
     prefix: '/',
+    index: 'index.html',
     decorateReply: false,
   });
 
