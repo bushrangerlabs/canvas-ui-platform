@@ -8,10 +8,11 @@ import type { WsInboundMessage, WsOutboundMessage } from '../types';
 type MessageHandler = (msg: WsInboundMessage) => void;
 
 const WS_URL = (() => {
-  const base = import.meta.env.VITE_WS_URL;
-  if (base) return base;
+  if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
   const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  return `${proto}//${window.location.host}/ws`;
+  const match = window.location.pathname.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+  const prefix = match ? match[1] : '';
+  return `${proto}//${window.location.host}${prefix}/ws`;
 })();
 
 const RECONNECT_DELAY = 3000;
