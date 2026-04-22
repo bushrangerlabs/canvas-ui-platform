@@ -5,6 +5,8 @@ import path from 'path'
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
+  // Relative base so assets load correctly through HA ingress proxy prefix
+  base: './',
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
