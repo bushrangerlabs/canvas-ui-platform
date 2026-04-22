@@ -39,4 +39,5 @@ export CORS_ORIGINS="*"
 echo "[canvas-ui] Starting Canvas UI Platform server on port ${PORT}"
 
 cd /app/server
-exec node dist/index.js
+# Merge stderr into stdout so HA log viewer captures crash errors
+exec node dist/index.js 2>&1

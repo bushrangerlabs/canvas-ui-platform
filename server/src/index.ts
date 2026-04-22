@@ -3,7 +3,6 @@ import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
 import staticFiles from '@fastify/static';
-import { createServer } from 'http';
 import path from 'path';
 import { config } from './config';
 import { initDb } from './db/index';
@@ -57,11 +56,7 @@ async function main() {
   app.get('/health', async () => ({ ok: true }));
 
   // ── HTTP server + WebSocket ───────────────────────────────────────────────
-  // We use a raw http.Server so we can attach the WebSocketServer to it
   await app.ready();
-  const httpServer = createServer(app.server);
-  // Detach Fastify from its built-in server and reattach to ours
-  // Actually: Fastify already owns a server; we attach wss to it directly
   initWss(app.server);
 
   // ── Start ─────────────────────────────────────────────────────────────────
@@ -78,5 +73,15 @@ async function main() {
     process.exit(1);
   }
 }
+
+process.on('uncaughtException', (err) => {
+  console.error('[canvas-ui] Uncaught exception:', err);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[canvas-ui] Unhandled rejection:', reason);
+  process.exit(1);
+});
 
 main();
