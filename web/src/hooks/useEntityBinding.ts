@@ -1,7 +1,7 @@
 /**
  * Platform stub — entity binding via HA is replaced by platform data sources.
- * Returns null for now; connect to platform data-source API in a future iteration.
+ * Returns the fallback value until real data-source wiring is implemented.
  */
-export function useEntityBinding(_config: Record<string, any>, _fieldName: string) {
-  return null;
+export function useEntityBinding(_config: Record<string, any>, _fieldName: string | undefined): string | undefined {
+  return _fieldName;
 }

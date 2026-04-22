@@ -7,6 +7,7 @@ import { TextWidgetMetadata } from './TextWidget';
 import { GaugeWidgetMetadata } from './GaugeWidget';
 import { ImageWidgetMetadata } from './ImageWidget';
 import { ProgressBarWidgetMetadata } from './ProgressBarWidget';
+import { ProgressCircleWidgetMetadata } from './ProgressCircleWidget';
 import { IFrameWidgetMetadata } from './IFrameWidget';
 import { BorderWidgetMetadata } from './BorderWidget';
 import { FlipClockWidgetMetadata } from './FlipClockWidget';
@@ -16,20 +17,37 @@ import { htmlWidgetMetadata } from './HtmlWidget';
 import { analogClockMetadata } from './AnalogClockWidget';
 import { ShapeWidgetMetadata } from './ShapeWidget';
 import { resolutionWidgetMetadata } from './ResolutionWidget';
+import { ButtonWidgetMetadata } from './ButtonWidget';
+import { SwitchWidgetMetadata } from './SwitchWidget';
+import { SliderWidgetMetadata } from './SliderWidget';
+import { ValueWidgetMetadata } from './ValueWidget';
+import { iconWidgetMetadata } from './IconWidget';
+import { KnobWidgetMetadata } from './KnobWidget';
 
 export const WIDGET_REGISTRY: Record<string, WidgetMetadata> = {
+  // Display
   text: TextWidgetMetadata,
+  value: ValueWidgetMetadata,
   gauge: GaugeWidgetMetadata,
-  image: ImageWidgetMetadata,
   progressbar: ProgressBarWidgetMetadata,
-  iframe: IFrameWidgetMetadata,
-  border: BorderWidgetMetadata,
+  progresscircle: ProgressCircleWidgetMetadata,
+  image: ImageWidgetMetadata,
+  icon: iconWidgetMetadata,
+  html: htmlWidgetMetadata,
+  scrollingtext: ScrollingTextWidgetMetadata,
+  shape: ShapeWidgetMetadata,
+  // Clocks
+  analogclock: analogClockMetadata,
   flipclock: FlipClockWidgetMetadata,
   digitalclock: DigitalClockWidgetMetadata,
-  scrollingtext: ScrollingTextWidgetMetadata,
-  html: htmlWidgetMetadata,
-  analogclock: analogClockMetadata,
-  shape: ShapeWidgetMetadata,
+  // Controls
+  button: ButtonWidgetMetadata,
+  switch: SwitchWidgetMetadata,
+  slider: SliderWidgetMetadata,
+  knob: KnobWidgetMetadata,
+  // Layout
+  iframe: IFrameWidgetMetadata,
+  border: BorderWidgetMetadata,
   resolution: resolutionWidgetMetadata,
 };
 

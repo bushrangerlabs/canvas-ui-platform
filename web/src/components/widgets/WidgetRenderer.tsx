@@ -5,18 +5,29 @@ import { lazy, Suspense } from 'react';
 import type { WidgetProps } from '../../types';
 
 const widgetMap: Record<string, React.LazyExoticComponent<React.FC<WidgetProps>>> = {
+  // Display
   text: lazy(() => import('./TextWidget')),
+  value: lazy(() => import('./ValueWidget')),
   gauge: lazy(() => import('./GaugeWidget')),
-  image: lazy(() => import('./ImageWidget')),
   progressbar: lazy(() => import('./ProgressBarWidget')),
-  iframe: lazy(() => import('./IFrameWidget')),
-  border: lazy(() => import('./BorderWidget')),
+  progresscircle: lazy(() => import('./ProgressCircleWidget')),
+  image: lazy(() => import('./ImageWidget')),
+  icon: lazy(() => import('./IconWidget')),
+  html: lazy(() => import('./HtmlWidget')),
+  scrollingtext: lazy(() => import('./ScrollingTextWidget')),
+  shape: lazy(() => import('./ShapeWidget')),
+  // Clocks
+  analogclock: lazy(() => import('./AnalogClockWidget')),
   flipclock: lazy(() => import('./FlipClockWidget')),
   digitalclock: lazy(() => import('./DigitalClockWidget')),
-  scrollingtext: lazy(() => import('./ScrollingTextWidget')),
-  html: lazy(() => import('./HtmlWidget')),
-  analogclock: lazy(() => import('./AnalogClockWidget')),
-  shape: lazy(() => import('./ShapeWidget')),
+  // Controls
+  button: lazy(() => import('./ButtonWidget')),
+  switch: lazy(() => import('./SwitchWidget')),
+  slider: lazy(() => import('./SliderWidget')),
+  knob: lazy(() => import('./KnobWidget')),
+  // Layout
+  iframe: lazy(() => import('./IFrameWidget')),
+  border: lazy(() => import('./BorderWidget')),
   resolution: lazy(() => import('./ResolutionWidget')),
 };
 

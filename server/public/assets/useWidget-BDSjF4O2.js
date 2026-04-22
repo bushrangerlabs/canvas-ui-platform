@@ -1,1 +1,0 @@
-import{a as e}from"./rolldown-runtime-BYbx6iT9.js";import{n as t}from"./jsx-runtime-BgMs7Gb-.js";var n=e(t(),1);function r(e,t){return{entityData:{},updateConfig:(0,n.useCallback)(e=>{t?.(e)},[t]),getEntity:()=>null,getEntityState:()=>null}}export{r as t};

@@ -7,6 +7,7 @@ export interface UseWidgetReturn {
   getEntity: (fieldName: string) => any;
   /** Alias kept for compatibility with ported widgets */
   getEntityState: (fieldName: string) => any;
+  isEntityAvailable: (fieldName: string) => boolean;
 }
 
 export function useWidget(
@@ -16,5 +17,5 @@ export function useWidget(
   const updateConfig = useCallback((changes: Partial<WidgetConfig>) => {
     onUpdate?.(changes);
   }, [onUpdate]);
-  return { entityData: {}, updateConfig, getEntity: () => null, getEntityState: () => null };
+  return { entityData: {}, updateConfig, getEntity: () => null, getEntityState: () => null, isEntityAvailable: () => false };
 }
