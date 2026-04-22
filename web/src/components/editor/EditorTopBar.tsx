@@ -1,6 +1,8 @@
 import { Box, AppBar, Toolbar, Typography, Button, Chip, IconButton, Tooltip } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import UndoIcon from '@mui/icons-material/Undo';
+import GridOnIcon from '@mui/icons-material/GridOn';
+import GridOffIcon from '@mui/icons-material/GridOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
@@ -12,7 +14,7 @@ interface Props {
 }
 
 export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
-  const { activeView, isDirty, saveActiveView } = useEditorStore();
+  const { activeView, isDirty, saveActiveView, snapEnabled, toggleSnap } = useEditorStore();
 
   return (
     <AppBar
@@ -53,6 +55,12 @@ export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
               <VisibilityIcon fontSize="small" />
             </IconButton>
           </span>
+        </Tooltip>
+
+        <Tooltip title={snapEnabled ? 'Snap to grid: ON (click to disable)' : 'Snap to grid: OFF (click to enable)'}>
+          <IconButton size="small" onClick={toggleSnap} color={snapEnabled ? 'primary' : 'default'}>
+            {snapEnabled ? <GridOnIcon fontSize="small" /> : <GridOffIcon fontSize="small" />}
+          </IconButton>
         </Tooltip>
 
         <Tooltip title="Undo (coming soon)">

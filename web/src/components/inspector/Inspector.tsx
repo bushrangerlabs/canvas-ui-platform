@@ -2,7 +2,7 @@
  * Inspector — right-side panel for editing the selected widget or the active view.
  * Tabs: View (view properties) | Widget (widget config when one is selected)
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Accordion, AccordionDetails, AccordionSummary,
   Box, Checkbox, Divider, FormControl, FormControlLabel,
@@ -12,6 +12,10 @@ import {
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteIcon from '@mui/icons-material/Delete';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import FlipToFrontIcon from '@mui/icons-material/FlipToFront';
+import FlipToBackIcon from '@mui/icons-material/FlipToBack';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import { useEditorStore } from '../../store';
 import { WIDGET_REGISTRY } from '../widgets/registry';
 import type { FieldMetadata } from '../widgets/metadata';
@@ -138,8 +142,8 @@ function ViewTab() {
 // ── Widget tab ────────────────────────────────────────────────────────────────
 
 function WidgetTab() {
-  const { activeView, selectedWidgetId, updateWidget, removeWidget, duplicateWidget } =
-    useEditorStore();
+  const { activeView, selectedWidgetId, updateWidget, removeWidget, duplicateWidget,
+          bringToFront, sendToBack, bringForward, sendBackward } = useEditorStore();
 
   const widget = activeView?.widgets.find((w) => w.id === selectedWidgetId);
   const meta = widget ? WIDGET_REGISTRY[widget.type] : undefined;
@@ -203,6 +207,21 @@ function WidgetTab() {
                 sx={{ gridColumn: key === 'zIndex' ? '1 / -1' : undefined }}
               />
             ))}
+            {/* Z-order quick actions */}
+            <Box sx={{ gridColumn: '1 / -1', display: 'flex', gap: 0.5, mt: 0.5 }}>
+              <Tooltip title="Send to Back">
+                <IconButton size="small" onClick={() => sendToBack(widget.id)}><FlipToBackIcon fontSize="small" /></IconButton>
+              </Tooltip>
+              <Tooltip title="Send Backward">
+                <IconButton size="small" onClick={() => sendBackward(widget.id)}><ArrowDownwardIcon fontSize="small" /></IconButton>
+              </Tooltip>
+              <Tooltip title="Bring Forward">
+                <IconButton size="small" onClick={() => bringForward(widget.id)}><ArrowUpwardIcon fontSize="small" /></IconButton>
+              </Tooltip>
+              <Tooltip title="Bring to Front">
+                <IconButton size="small" onClick={() => bringToFront(widget.id)}><FlipToFrontIcon fontSize="small" /></IconButton>
+              </Tooltip>
+            </Box>
           </Box>
         </AccordionDetails>
       </Accordion>
@@ -367,6 +386,11 @@ function renderField(
 export default function Inspector() {
   const { selectedWidgetId } = useEditorStore();
   const [tab, setTab] = useState<'view' | 'widget'>('view');
+
+  // Auto-switch to Widget tab when a widget is selected on the canvas
+  useEffect(() => {
+    if (selectedWidgetId) setTab('widget');
+  }, [selectedWidgetId]);
 
   return (
     <Box

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
+import { HAEntitiesProvider } from './context/HAEntitiesContext';
 import EditorPage from './pages/EditorPage';
 import DisplayPage from './pages/DisplayPage';
 
@@ -29,13 +30,15 @@ export default function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <BrowserRouter basename={getBasename()}>
-        <Routes>
-          <Route path="/" element={<Navigate to="/editor" replace />} />
-          <Route path="/editor/*" element={<EditorPage />} />
-          <Route path="/display" element={<DisplayPage />} />
-        </Routes>
-      </BrowserRouter>
+      <HAEntitiesProvider>
+        <BrowserRouter basename={getBasename()}>
+          <Routes>
+            <Route path="/" element={<Navigate to="/editor" replace />} />
+            <Route path="/editor/*" element={<EditorPage />} />
+            <Route path="/display" element={<DisplayPage />} />
+          </Routes>
+        </BrowserRouter>
+      </HAEntitiesProvider>
     </ThemeProvider>
   );
 }

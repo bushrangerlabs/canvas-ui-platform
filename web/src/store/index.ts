@@ -20,6 +20,11 @@ interface EditorState {
   // ── selection state ──────────────────────────────────────────────────────
   selectedWidgetId: string | null;
 
+  // ── snap-to-grid ─────────────────────────────────────────────────────────
+  snapEnabled: boolean;
+  snapSize: number;
+  toggleSnap: () => void;
+
   // ── actions ──────────────────────────────────────────────────────────────
   loadViews: () => Promise<void>;
   openView: (id: string) => Promise<void>;
@@ -38,8 +43,13 @@ interface EditorState {
   removeWidget: (id: string) => void;
   duplicateWidget: (id: string) => void;
   selectWidget: (id: string | null) => void;
-
   setSelectedWidgetId: (id: string | null) => void;
+
+  // z-order
+  bringToFront: (id: string) => void;
+  sendToBack: (id: string) => void;
+  bringForward: (id: string) => void;
+  sendBackward: (id: string) => void;
 }
 
 function defaultView(name: string): ViewConfig {
@@ -61,6 +71,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeView: null,
   isDirty: false,
   selectedWidgetId: null,
+  snapEnabled: false,
+  snapSize: 10,
+  toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled })),
 
   loadViews: async () => {
     set({ viewsLoading: true, viewsError: null });
@@ -227,4 +240,66 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   selectWidget: (id) => set({ selectedWidgetId: id }),
   setSelectedWidgetId: (id) => set({ selectedWidgetId: id }),
+
+  bringToFront: (id) => {
+    set((s) => {
+      if (!s.activeView) return s;
+      const maxZ = Math.max(0, ...s.activeView.widgets.map((w) => w.position.zIndex ?? 1));
+      return {
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.map((w) =>
+            w.id === id ? { ...w, position: { ...w.position, zIndex: maxZ + 1 } } : w,
+          ),
+        },
+        isDirty: true,
+      };
+    });
+  },
+
+  sendToBack: (id) => {
+    set((s) => {
+      if (!s.activeView) return s;
+      const minZ = Math.min(1, ...s.activeView.widgets.map((w) => w.position.zIndex ?? 1));
+      return {
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.map((w) =>
+            w.id === id ? { ...w, position: { ...w.position, zIndex: Math.max(0, minZ - 1) } } : w,
+          ),
+        },
+        isDirty: true,
+      };
+    });
+  },
+
+  bringForward: (id) => {
+    set((s) => {
+      if (!s.activeView) return s;
+      return {
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.map((w) =>
+            w.id === id ? { ...w, position: { ...w.position, zIndex: (w.position.zIndex ?? 1) + 1 } } : w,
+          ),
+        },
+        isDirty: true,
+      };
+    });
+  },
+
+  sendBackward: (id) => {
+    set((s) => {
+      if (!s.activeView) return s;
+      return {
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.map((w) =>
+            w.id === id ? { ...w, position: { ...w.position, zIndex: Math.max(0, (w.position.zIndex ?? 1) - 1) } } : w,
+          ),
+        },
+        isDirty: true,
+      };
+    });
+  },
 }));

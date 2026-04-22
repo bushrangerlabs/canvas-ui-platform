@@ -44,7 +44,8 @@ const HANDLE_DEFS: { handle: ResizeHandle; cursor: string; style: React.CSSPrope
 ];
 
 export default function CanvasArea() {
-  const { activeView, selectedWidgetId, selectWidget, updateWidget } = useEditorStore();
+  const { activeView, selectedWidgetId, selectWidget, updateWidget, snapEnabled, snapSize } = useEditorStore();
+  const snap = (v: number) => snapEnabled ? Math.round(v / snapSize) * snapSize : Math.round(v);
   const [zoom, setZoom] = useState(0.5);
   const [pan, setPan] = useState({ x: 20, y: 20 });
   const dragRef = useRef<DragState | null>(null);
@@ -144,8 +145,8 @@ export default function CanvasArea() {
       updateWidget(dragRef.current.widgetId, {
         position: {
           ...activeView!.widgets.find((w) => w.id === dragRef.current!.widgetId)!.position,
-          x: Math.round(dragRef.current.origX + dx),
-          y: Math.round(dragRef.current.origY + dy),
+          x: snap(dragRef.current.origX + dx),
+          y: snap(dragRef.current.origY + dy),
         },
       });
     }
@@ -156,16 +157,16 @@ export default function CanvasArea() {
       const dy = (e.clientY - r.startY) / zoom;
       let { origX: x, origY: y, origW: w, origH: h } = r;
 
-      if (r.handle.includes('e')) w = Math.max(MIN_SIZE, Math.round(r.origW + dx));
-      if (r.handle.includes('s')) h = Math.max(MIN_SIZE, Math.round(r.origH + dy));
+      if (r.handle.includes('e')) w = Math.max(MIN_SIZE, snap(r.origW + dx));
+      if (r.handle.includes('s')) h = Math.max(MIN_SIZE, snap(r.origH + dy));
       if (r.handle.includes('w')) {
-        const newW = Math.max(MIN_SIZE, Math.round(r.origW - dx));
-        x = Math.round(r.origX + r.origW - newW);
+        const newW = Math.max(MIN_SIZE, snap(r.origW - dx));
+        x = snap(r.origX + r.origW - newW);
         w = newW;
       }
       if (r.handle.includes('n')) {
-        const newH = Math.max(MIN_SIZE, Math.round(r.origH - dy));
-        y = Math.round(r.origY + r.origH - newH);
+        const newH = Math.max(MIN_SIZE, snap(r.origH - dy));
+        y = snap(r.origY + r.origH - newH);
         h = newH;
       }
 

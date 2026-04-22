@@ -23,6 +23,11 @@ import { SliderWidgetMetadata } from './SliderWidget';
 import { ValueWidgetMetadata } from './ValueWidget';
 import { iconWidgetMetadata } from './IconWidget';
 import { KnobWidgetMetadata } from './KnobWidget';
+import { InputTextWidgetMetadata } from './InputTextWidget';
+import { RadioButtonWidgetMetadata } from './RadioButtonWidget';
+import { ColorPickerWidgetMetadata } from './ColorPickerWidget';
+import { WeatherWidgetMetadata } from './WeatherWidget';
+import { GraphWidgetMetadata } from './GraphWidget';
 
 export const WIDGET_REGISTRY: Record<string, WidgetMetadata> = {
   // Display
@@ -45,10 +50,16 @@ export const WIDGET_REGISTRY: Record<string, WidgetMetadata> = {
   switch: SwitchWidgetMetadata,
   slider: SliderWidgetMetadata,
   knob: KnobWidgetMetadata,
+  inputtext: InputTextWidgetMetadata,
+  radiobutton: RadioButtonWidgetMetadata,
+  colorpicker: ColorPickerWidgetMetadata,
   // Layout
   iframe: IFrameWidgetMetadata,
   border: BorderWidgetMetadata,
   resolution: resolutionWidgetMetadata,
+  // Data
+  weather: WeatherWidgetMetadata,
+  graph: GraphWidgetMetadata,
 };
 
 export function getWidgetTypes(): string[] {

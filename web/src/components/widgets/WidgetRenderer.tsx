@@ -48,10 +48,16 @@ const widgetMap: Record<string, React.LazyExoticComponent<React.FC<WidgetProps>>
   switch: lazy(() => import('./SwitchWidget')),
   slider: lazy(() => import('./SliderWidget')),
   knob: lazy(() => import('./KnobWidget')),
+  inputtext: lazy(() => import('./InputTextWidget')),
+  radiobutton: lazy(() => import('./RadioButtonWidget')),
+  colorpicker: lazy(() => import('./ColorPickerWidget')),
   // Layout
   iframe: lazy(() => import('./IFrameWidget')),
   border: lazy(() => import('./BorderWidget')),
   resolution: lazy(() => import('./ResolutionWidget')),
+  // Data
+  weather: lazy(() => import('./WeatherWidget')),
+  graph: lazy(() => import('./GraphWidget')),
 };
 
 export default function WidgetRenderer(props: WidgetProps) {
