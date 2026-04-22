@@ -43,12 +43,20 @@ async function main() {
     decorateReply: false,
   });
 
+  // Never cache index.html — ensures fresh asset hashes after updates
+  app.addHook('onSend', async (request, reply) => {
+    if (request.url === '/' || request.url.endsWith('/index.html')) {
+      reply.header('Cache-Control', 'no-store');
+    }
+  });
+
   // SPA fallback — all non-API routes serve index.html
   app.setNotFoundHandler(async (request, reply) => {
     if (request.url.startsWith('/api') || request.url.startsWith('/ws')) {
       reply.code(404).send({ error: 'Not Found', statusCode: 404 });
       return;
     }
+    reply.header('Cache-Control', 'no-store');
     return reply.sendFile('index.html', webRoot);
   });
 

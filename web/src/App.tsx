@@ -3,6 +3,13 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import EditorPage from './pages/EditorPage';
 import DisplayPage from './pages/DisplayPage';
 
+// When served through HA ingress the path is /api/hassio_ingress/<token>/...
+// Extract that prefix as the router basename so React Router sees clean paths.
+function getBasename(): string {
+  const match = window.location.pathname.match(/^(\/api\/hassio_ingress\/[^/]+)/);
+  return match ? match[1] : '';
+}
+
 const darkTheme = createTheme({
   palette: {
     mode: 'dark',
@@ -22,7 +29,7 @@ export default function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <BrowserRouter>
+      <BrowserRouter basename={getBasename()}>
         <Routes>
           <Route path="/" element={<Navigate to="/editor" replace />} />
           <Route path="/editor/*" element={<EditorPage />} />
