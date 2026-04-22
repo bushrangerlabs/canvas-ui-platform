@@ -1,5 +1,5 @@
 /**
- * CanvasArea — editor canvas with widget drag, selection, and zoom.
+ * CanvasArea — editor canvas with widget drag, resize, selection, and zoom.
  */
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
@@ -9,6 +9,9 @@ import type { WidgetConfig } from '../../types';
 
 const MIN_ZOOM = 0.2;
 const MAX_ZOOM = 2;
+const MIN_SIZE = 20;
+
+type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
 
 interface DragState {
   widgetId: string;
@@ -18,11 +21,34 @@ interface DragState {
   origY: number;
 }
 
+interface ResizeState {
+  widgetId: string;
+  handle: ResizeHandle;
+  startX: number;
+  startY: number;
+  origX: number;
+  origY: number;
+  origW: number;
+  origH: number;
+}
+
+const HANDLE_DEFS: { handle: ResizeHandle; cursor: string; style: React.CSSProperties }[] = [
+  { handle: 'nw', cursor: 'nw-resize', style: { top: -4, left: -4 } },
+  { handle: 'n',  cursor: 'n-resize',  style: { top: -4, left: '50%', transform: 'translateX(-50%)' } },
+  { handle: 'ne', cursor: 'ne-resize', style: { top: -4, right: -4 } },
+  { handle: 'e',  cursor: 'e-resize',  style: { top: '50%', right: -4, transform: 'translateY(-50%)' } },
+  { handle: 'se', cursor: 'se-resize', style: { bottom: -4, right: -4 } },
+  { handle: 's',  cursor: 's-resize',  style: { bottom: -4, left: '50%', transform: 'translateX(-50%)' } },
+  { handle: 'sw', cursor: 'sw-resize', style: { bottom: -4, left: -4 } },
+  { handle: 'w',  cursor: 'w-resize',  style: { top: '50%', left: -4, transform: 'translateY(-50%)' } },
+];
+
 export default function CanvasArea() {
   const { activeView, selectedWidgetId, selectWidget, updateWidget } = useEditorStore();
   const [zoom, setZoom] = useState(0.7);
   const [pan, setPan] = useState({ x: 40, y: 40 });
   const dragRef = useRef<DragState | null>(null);
+  const resizeRef = useRef<ResizeState | null>(null);
   const panDragRef = useRef<{ startX: number; startY: number; origPan: { x: number; y: number } } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -53,6 +79,22 @@ export default function CanvasArea() {
     };
   };
 
+  // ── Resize drag ────────────────────────────────────────────────────────────
+  const onResizeMouseDown = (e: React.MouseEvent, widget: WidgetConfig, handle: ResizeHandle) => {
+    e.stopPropagation();
+    e.preventDefault();
+    resizeRef.current = {
+      widgetId: widget.id,
+      handle,
+      startX: e.clientX,
+      startY: e.clientY,
+      origX: widget.position.x,
+      origY: widget.position.y,
+      origW: widget.position.width,
+      origH: widget.position.height,
+    };
+  };
+
   const onMouseMove = (e: React.MouseEvent) => {
     if (dragRef.current) {
       const dx = (e.clientX - dragRef.current.startX) / zoom;
@@ -65,6 +107,32 @@ export default function CanvasArea() {
         },
       });
     }
+
+    if (resizeRef.current) {
+      const r = resizeRef.current;
+      const dx = (e.clientX - r.startX) / zoom;
+      const dy = (e.clientY - r.startY) / zoom;
+      let { origX: x, origY: y, origW: w, origH: h } = r;
+
+      if (r.handle.includes('e')) w = Math.max(MIN_SIZE, Math.round(r.origW + dx));
+      if (r.handle.includes('s')) h = Math.max(MIN_SIZE, Math.round(r.origH + dy));
+      if (r.handle.includes('w')) {
+        const newW = Math.max(MIN_SIZE, Math.round(r.origW - dx));
+        x = Math.round(r.origX + r.origW - newW);
+        w = newW;
+      }
+      if (r.handle.includes('n')) {
+        const newH = Math.max(MIN_SIZE, Math.round(r.origH - dy));
+        y = Math.round(r.origY + r.origH - newH);
+        h = newH;
+      }
+
+      const orig = activeView!.widgets.find((ww) => ww.id === r.widgetId)!;
+      updateWidget(r.widgetId, {
+        position: { ...orig.position, x, y, width: w, height: h },
+      });
+    }
+
     if (panDragRef.current) {
       const dx = e.clientX - panDragRef.current.startX;
       const dy = e.clientY - panDragRef.current.startY;
@@ -74,6 +142,7 @@ export default function CanvasArea() {
 
   const onMouseUp = () => {
     dragRef.current = null;
+    resizeRef.current = null;
     panDragRef.current = null;
   };
 
@@ -86,15 +155,7 @@ export default function CanvasArea() {
 
   if (!activeView) {
     return (
-      <Box
-        sx={{
-          flex: 1,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          bgcolor: '#0a0a18',
-        }}
-      >
+      <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#0a0a18' }}>
         <Typography color="text.secondary">
           Select or create a view in the sidebar to start editing.
         </Typography>
@@ -159,6 +220,25 @@ export default function CanvasArea() {
                 }}
               >
                 <WidgetRenderer config={w} isEditMode={true} />
+
+                {/* Resize handles — only on selected widget */}
+                {selected && HANDLE_DEFS.map(({ handle, cursor, style: hs }) => (
+                  <div
+                    key={handle}
+                    onMouseDown={(e) => onResizeMouseDown(e, w, handle)}
+                    style={{
+                      position: 'absolute',
+                      width: 8,
+                      height: 8,
+                      background: '#6c63ff',
+                      border: '1px solid #fff',
+                      borderRadius: 1,
+                      cursor,
+                      zIndex: 1000,
+                      ...hs,
+                    }}
+                  />
+                ))}
               </div>
             );
           })}
