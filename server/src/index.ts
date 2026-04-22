@@ -2,7 +2,9 @@ import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
 import multipart from '@fastify/multipart';
+import staticFiles from '@fastify/static';
 import { createServer } from 'http';
+import path from 'path';
 import { config } from './config';
 import { initDb } from './db/index';
 import { initWss } from './ws/index';
@@ -29,6 +31,23 @@ async function main() {
   await app.register(dataSourceRoutes, { prefix: '/api' });
   await app.register(imageRoutes,      { prefix: '/api' });
   await app.register(serverRoutes,     { prefix: '/api' });
+
+  // ── Serve web SPA (editor + display) ─────────────────────────────────────
+  const webRoot = path.join(__dirname, '..', 'public');
+  await app.register(staticFiles, {
+    root: webRoot,
+    prefix: '/',
+    decorateReply: false,
+  });
+
+  // SPA fallback — all non-API routes serve index.html
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.url.startsWith('/api') || request.url.startsWith('/ws')) {
+      reply.code(404).send({ error: 'Not Found', statusCode: 404 });
+      return;
+    }
+    return reply.sendFile('index.html', webRoot);
+  });
 
   // Health check (no prefix)
   app.get('/health', async () => ({ ok: true }));
