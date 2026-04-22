@@ -77,3 +77,15 @@ export const devicesApi = {
 export const serverApi = {
   status: () => api.get<{ version: string; uptime: number; views: number; devices: number }>('/api/status'),
 };
+
+// ── HA Proxy ──────────────────────────────────────────────────────────────────
+
+export interface HaEntityState {
+  entity_id: string;
+  state: string;
+  attributes: Record<string, any>;
+}
+
+export const haApi = {
+  states: () => api.get<HaEntityState[]>('/api/ha/states'),
+};

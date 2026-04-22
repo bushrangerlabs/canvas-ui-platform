@@ -29,6 +29,8 @@ interface EditorState {
 
   // view-level edits
   updateViewStyle: (style: Partial<ViewStyle>) => void;
+  updateViewName: (name: string) => void;
+  updateViewSize: (w: number, h: number) => void;
 
   // widget CRUD
   addWidget: (widget: Omit<WidgetConfig, 'id'>) => string;
@@ -132,12 +134,23 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => {
       if (!s.activeView) return s;
       return {
-        activeView: {
-          ...s.activeView,
-          style: { ...s.activeView.style, ...style },
-        },
+        activeView: { ...s.activeView, style: { ...s.activeView.style, ...style } },
         isDirty: true,
       };
+    });
+  },
+
+  updateViewName: (name) => {
+    set((s) => {
+      if (!s.activeView) return s;
+      return { activeView: { ...s.activeView, name }, isDirty: true };
+    });
+  },
+
+  updateViewSize: (w, h) => {
+    set((s) => {
+      if (!s.activeView) return s;
+      return { activeView: { ...s.activeView, sizex: w, sizey: h }, isDirty: true };
     });
   },
 

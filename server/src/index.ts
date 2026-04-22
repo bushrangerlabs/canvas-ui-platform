@@ -12,6 +12,7 @@ import { deviceRoutes } from './routes/devices';
 import { dataSourceRoutes } from './routes/datasources';
 import { imageRoutes } from './routes/images';
 import { serverRoutes } from './routes/server';
+import { haRoutes } from './routes/ha';
 
 async function main() {
   // ── Database ──────────────────────────────────────────────────────────────
@@ -33,6 +34,7 @@ async function main() {
   await app.register(dataSourceRoutes, { prefix: '/api' });
   await app.register(imageRoutes,      { prefix: '/api' });
   await app.register(serverRoutes,     { prefix: '/api' });
+  await app.register(haRoutes,         { prefix: '/api' });
 
   // ── Serve web SPA (editor + display) ─────────────────────────────────────
   const webRoot = path.join(__dirname, '..', 'public');
