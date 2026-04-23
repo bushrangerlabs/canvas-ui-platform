@@ -2,9 +2,10 @@
  * CanvasRenderer — pure display of a view (no edit affordances).
  * Used in DisplayPage and as a preview.
  */
-import type { ViewConfig, DataSourceValue } from '../../types';
+import type { ViewConfig, DataSourceValue, WidgetConfig } from '../../types';
 import WidgetRenderer from '../widgets/WidgetRenderer';
 import { useDataSourceValues } from '../../context/DataSourceValuesContext';
+import { useVisibility } from '../../hooks/useVisibility';
 
 interface Props {
   view: ViewConfig;
@@ -22,6 +23,37 @@ function resolveBindings(
     if (dv !== undefined) result[field] = dv;
   }
   return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/** Wrapper that evaluates visibility before rendering */
+function VisibleWidget({
+  w, isEditMode, resolvedBindings,
+}: {
+  w: WidgetConfig;
+  isEditMode: boolean;
+  resolvedBindings: Record<string, DataSourceValue> | undefined;
+}) {
+  const visible = useVisibility(w.visibility);
+  if (!visible) return null;
+  if (isEditMode && w.hiddenInEdit) return null;
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: w.position.x,
+        top: w.position.y,
+        width: w.position.width,
+        height: w.position.height,
+        zIndex: w.position.zIndex ?? 1,
+      }}
+    >
+      <WidgetRenderer
+        config={w}
+        isEditMode={isEditMode}
+        dataValues={resolvedBindings}
+      />
+    </div>
+  );
 }
 
 export default function CanvasRenderer({ view, isEditMode }: Props) {
@@ -43,23 +75,12 @@ export default function CanvasRenderer({ view, isEditMode }: Props) {
       }}
     >
       {widgets.map((w) => (
-        <div
+        <VisibleWidget
           key={w.id}
-          style={{
-            position: 'absolute',
-            left: w.position.x,
-            top: w.position.y,
-            width: w.position.width,
-            height: w.position.height,
-            zIndex: w.position.zIndex ?? 1,
-          }}
-        >
-          <WidgetRenderer
-            config={w}
-            isEditMode={isEditMode}
-            dataValues={resolveBindings(w.bindings, values)}
-          />
-        </div>
+          w={w}
+          isEditMode={isEditMode}
+          resolvedBindings={resolveBindings(w.bindings, values)}
+        />
       ))}
     </div>
   );
