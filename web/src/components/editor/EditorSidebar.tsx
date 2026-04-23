@@ -130,11 +130,11 @@ export default function EditorSidebar() {
         overflow: 'hidden',
       }}
     >
-      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth" sx={{ minHeight: 40 }}>
-        <Tab icon={<ViewQuiltIcon fontSize="small" />} iconPosition="start" label="Views" sx={{ minHeight: 40, fontSize: 11 }} />
-        <Tab icon={<WidgetsIcon fontSize="small" />} iconPosition="start" label="Widgets" sx={{ minHeight: 40, fontSize: 11 }} />
-        <Tab icon={<LayersIcon fontSize="small" />} iconPosition="start" label="Layers" sx={{ minHeight: 40, fontSize: 11 }} />
-        <Tab icon={<SmartToyOutlinedIcon fontSize="small" />} iconPosition="start" label="AI" sx={{ minHeight: 40, fontSize: 11 }} />
+      <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" scrollButtons="auto" sx={{ minHeight: 40 }}>
+        <Tab icon={<ViewQuiltIcon fontSize="small" />} iconPosition="start" label="Views" sx={{ minHeight: 40, fontSize: 11, minWidth: 0, px: 1 }} />
+        <Tab icon={<WidgetsIcon fontSize="small" />} iconPosition="start" label="Widgets" sx={{ minHeight: 40, fontSize: 11, minWidth: 0, px: 1 }} />
+        <Tab icon={<LayersIcon fontSize="small" />} iconPosition="start" label="Layers" sx={{ minHeight: 40, fontSize: 11, minWidth: 0, px: 1 }} />
+        <Tab icon={<SmartToyOutlinedIcon fontSize="small" />} iconPosition="start" label="AI" sx={{ minHeight: 40, fontSize: 11, minWidth: 0, px: 1 }} />
       </Tabs>
       <Divider />
 
