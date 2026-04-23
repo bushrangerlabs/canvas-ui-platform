@@ -5,9 +5,11 @@ import RedoIcon from '@mui/icons-material/Redo';
 import GridOnIcon from '@mui/icons-material/GridOn';
 import GridOffIcon from '@mui/icons-material/GridOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
+import MonitorIcon from '@mui/icons-material/Monitor';
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../../store';
 
 interface Props {
@@ -16,6 +18,7 @@ interface Props {
 }
 
 export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
+  const navigate = useNavigate();
   const { activeView, isDirty, saveActiveView, snapEnabled, toggleSnap, _past, _future, undo, redo } = useEditorStore();
   const canUndo = _past.length > 0;
   const canRedo = _future.length > 0;
@@ -70,6 +73,12 @@ export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
               <VisibilityIcon fontSize="small" />
             </IconButton>
           </span>
+        </Tooltip>
+
+        <Tooltip title="Manage devices">
+          <IconButton size="small" onClick={() => navigate('/devices')}>
+            <MonitorIcon fontSize="small" />
+          </IconButton>
         </Tooltip>
 
         <Tooltip title={snapEnabled ? 'Snap to grid: ON (click to disable)' : 'Snap to grid: OFF (click to enable)'}>

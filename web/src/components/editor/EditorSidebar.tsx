@@ -2,23 +2,39 @@ import { useState } from 'react';
 import {
   Box, Tabs, Tab, List, ListItemButton, ListItemText, ListItemIcon,
   Typography, IconButton, Button, Tooltip, Divider, TextField,
-  Dialog, DialogTitle, DialogContent, DialogActions,
+  Dialog, DialogTitle, DialogContent, DialogActions, Collapse,
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
-import WidgetsIcon from '@mui/icons-material/Widgets';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
+import WidgetsIcon from '@mui/icons-material/Widgets';
 import { useEditorStore } from '../../store';
 import { WIDGET_REGISTRY } from '../widgets/registry';
+import WidgetIcon from '../WidgetIcon';
 import type { WidgetConfig } from '../../types';
+
+const CATEGORY_ORDER = ['display', 'clocks', 'control', 'data', 'layout'];
+const CATEGORY_LABELS: Record<string, string> = {
+  display: 'Display',
+  clocks: 'Clocks',
+  control: 'Controls',
+  data: 'Data',
+  layout: 'Layout',
+};
 
 export default function EditorSidebar() {
   const [tab, setTab] = useState(0);
   const [newViewName, setNewViewName] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
   const { views, activeViewId, openView, createView, deleteView, addWidget, activeView } = useEditorStore();
+
+  const toggleCategory = (cat: string) =>
+    setCollapsedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
 
   async function handleCreateView() {
     if (!newViewName.trim()) return;
@@ -43,8 +59,18 @@ export default function EditorSidebar() {
 
   const filteredWidgets = Object.entries(WIDGET_REGISTRY).filter(([, meta]) =>
     meta.name.toLowerCase().includes(search.toLowerCase()) ||
-    meta.category.includes(search.toLowerCase())
+    meta.category.toLowerCase().includes(search.toLowerCase())
   );
+
+  // Group by category when not searching
+  const groupedWidgets = CATEGORY_ORDER.map((cat) => ({
+    cat,
+    label: CATEGORY_LABELS[cat] ?? cat,
+    widgets: filteredWidgets.filter(([, m]) => m.category.toLowerCase() === cat.toLowerCase()),
+  })).filter((g) => g.widgets.length > 0);
+
+  // If searching, show flat list; otherwise grouped
+  const isSearching = search.trim().length > 0;
 
   return (
     <Box
@@ -128,21 +154,42 @@ export default function EditorSidebar() {
             </Typography>
           )}
           <List dense sx={{ flex: 1, overflowY: 'auto', py: 0 }}>
-            {filteredWidgets.map(([type, meta]) => (
-              <ListItemButton
-                key={type}
-                onClick={() => handleAddWidget(type)}
-                disabled={!activeView}
-              >
-                <ListItemIcon sx={{ minWidth: 32 }}>
-                  <WidgetsIcon fontSize="small" sx={{ color: 'primary.main' }} />
-                </ListItemIcon>
-                <ListItemText
-                  primary={meta.name}
-                  secondary={meta.category}
-                />
-              </ListItemButton>
-            ))}
+            {isSearching ? (
+              filteredWidgets.map(([type, meta]) => (
+                <ListItemButton key={type} onClick={() => handleAddWidget(type)} disabled={!activeView}>
+                  <ListItemIcon sx={{ minWidth: 32 }}>
+                    <WidgetIcon name={meta.icon} fontSize="small" sx={{ color: 'primary.main' }} />
+                  </ListItemIcon>
+                  <ListItemText primary={meta.name} secondary={meta.category} />
+                </ListItemButton>
+              ))
+            ) : (
+              groupedWidgets.map(({ cat, label, widgets }) => (
+                <Box key={cat}>
+                  <ListItemButton
+                    dense
+                    onClick={() => toggleCategory(cat)}
+                    sx={{ py: 0.5, bgcolor: 'action.hover' }}
+                  >
+                    <ListItemText
+                      primary={label}
+                      slotProps={{ primary: { variant: 'caption', sx: { fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase' } } }}
+                    />
+                    {collapsedCategories[cat] ? <ExpandMoreIcon fontSize="small" /> : <ExpandLessIcon fontSize="small" />}
+                  </ListItemButton>
+                  <Collapse in={!collapsedCategories[cat]}>
+                    {widgets.map(([type, meta]) => (
+                      <ListItemButton key={type} onClick={() => handleAddWidget(type)} disabled={!activeView} sx={{ pl: 2 }}>
+                        <ListItemIcon sx={{ minWidth: 32 }}>
+                          <WidgetIcon name={meta.icon} fontSize="small" sx={{ color: 'primary.main' }} />
+                        </ListItemIcon>
+                        <ListItemText primary={meta.name} />
+                      </ListItemButton>
+                    ))}
+                  </Collapse>
+                </Box>
+              ))
+            )}
           </List>
         </Box>
       )}

@@ -3,6 +3,7 @@ import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { HAEntitiesProvider } from './context/HAEntitiesContext';
 import EditorPage from './pages/EditorPage';
 import DisplayPage from './pages/DisplayPage';
+import DevicesPage from './pages/DevicesPage';
 
 // When served through HA ingress the path is /api/hassio_ingress/<token>/...
 // Extract that prefix as the router basename so React Router sees clean paths.
@@ -36,6 +37,7 @@ export default function App() {
             <Route path="/" element={<Navigate to="/editor" replace />} />
             <Route path="/editor/*" element={<EditorPage />} />
             <Route path="/display" element={<DisplayPage />} />
+            <Route path="/devices" element={<DevicesPage />} />
           </Routes>
         </BrowserRouter>
       </HAEntitiesProvider>
