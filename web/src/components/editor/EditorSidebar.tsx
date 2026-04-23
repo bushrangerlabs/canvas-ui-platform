@@ -15,12 +15,11 @@ import { WIDGET_REGISTRY } from '../widgets/registry';
 import WidgetIcon from '../WidgetIcon';
 import type { WidgetConfig } from '../../types';
 
-const CATEGORY_ORDER = ['display', 'clocks', 'control', 'data', 'media', 'layout'];
+const CATEGORY_ORDER = ['display', 'clocks', 'control', 'media', 'layout'];
 const CATEGORY_LABELS: Record<string, string> = {
   display: 'Display',
   clocks: 'Clocks',
   control: 'Controls',
-  data: 'Data',
   media: 'Media',
   layout: 'Layout',
 };
