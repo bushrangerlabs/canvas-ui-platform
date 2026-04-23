@@ -10,6 +10,12 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
 import WidgetsIcon from '@mui/icons-material/Widgets';
+import LayersIcon from '@mui/icons-material/Layers';
+import LockIcon from '@mui/icons-material/Lock';
+import LockOpenIcon from '@mui/icons-material/LockOpen';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useEditorStore } from '../../store';
 import { WIDGET_REGISTRY } from '../widgets/registry';
 import WidgetIcon from '../WidgetIcon';
@@ -31,7 +37,9 @@ export default function EditorSidebar() {
   const [search, setSearch] = useState('');
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
-  const { views, activeViewId, openView, createView, deleteView, addWidget, activeView } = useEditorStore();
+  const { views, activeViewId, openView, createView, deleteView, addWidget, activeView,
+          selectWidget, selectedWidgetIds, toggleWidgetLocked, updateWidget } = useEditorStore();
+  const [dragLayerId, setDragLayerId] = useState<string | null>(null);
 
   const toggleCategory = (cat: string) =>
     setCollapsedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -86,8 +94,9 @@ export default function EditorSidebar() {
       }}
     >
       <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="fullWidth" sx={{ minHeight: 40 }}>
-        <Tab icon={<ViewQuiltIcon fontSize="small" />} iconPosition="start" label="Views" sx={{ minHeight: 40 }} />
-        <Tab icon={<WidgetsIcon fontSize="small" />} iconPosition="start" label="Widgets" sx={{ minHeight: 40 }} />
+        <Tab icon={<ViewQuiltIcon fontSize="small" />} iconPosition="start" label="Views" sx={{ minHeight: 40, fontSize: 11 }} />
+        <Tab icon={<WidgetsIcon fontSize="small" />} iconPosition="start" label="Widgets" sx={{ minHeight: 40, fontSize: 11 }} />
+        <Tab icon={<LayersIcon fontSize="small" />} iconPosition="start" label="Layers" sx={{ minHeight: 40, fontSize: 11 }} />
       </Tabs>
       <Divider />
 
@@ -191,6 +200,84 @@ export default function EditorSidebar() {
               ))
             )}
           </List>
+        </Box>
+      )}
+
+      {/* Layers panel */}
+      {tab === 2 && (
+        <Box sx={{ flex: 1, overflow: 'auto' }}>
+          {!activeView ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>No view open.</Typography>
+          ) : activeView.widgets.length === 0 ? (
+            <Typography variant="body2" color="text.secondary" sx={{ p: 2 }}>No widgets yet.</Typography>
+          ) : (
+            <List dense disablePadding>
+              {[...activeView.widgets]
+                .sort((a, b) => (b.position.zIndex ?? 1) - (a.position.zIndex ?? 1))
+                .map((w) => {
+                  const meta = WIDGET_REGISTRY[w.type];
+                  const isSelected = selectedWidgetIds.includes(w.id);
+                  return (
+                    <ListItemButton
+                      key={w.id}
+                      selected={isSelected}
+                      onClick={() => selectWidget(w.id)}
+                      draggable
+                      onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragLayerId(w.id); }}
+                      onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (!dragLayerId || dragLayerId === w.id || !activeView) return;
+                        const sorted = [...activeView.widgets]
+                          .sort((a, b) => (b.position.zIndex ?? 1) - (a.position.zIndex ?? 1));
+                        const fromIdx = sorted.findIndex((x) => x.id === dragLayerId);
+                        const toIdx = sorted.findIndex((x) => x.id === w.id);
+                        if (fromIdx < 0 || toIdx < 0) return;
+                        const reordered = [...sorted];
+                        const [moved] = reordered.splice(fromIdx, 1);
+                        reordered.splice(toIdx, 0, moved);
+                        const maxZ = reordered.length;
+                        reordered.forEach((widget, i) => {
+                          updateWidget(widget.id, { position: { ...widget.position, zIndex: maxZ - i } });
+                        });
+                        setDragLayerId(null);
+                      }}
+                      onDragEnd={() => setDragLayerId(null)}
+                      sx={{
+                        py: 0.5, px: 1, gap: 0.5,
+                        opacity: dragLayerId === w.id ? 0.4 : 1,
+                      }}
+                    >
+                      <DragIndicatorIcon sx={{ fontSize: 14, color: 'text.disabled', flexShrink: 0, cursor: 'grab', mr: 0.25 }} />
+                      <ListItemIcon sx={{ minWidth: 24 }}>
+                        <WidgetIcon name={meta?.icon ?? 'Widgets'} sx={{ fontSize: 14 }} />
+                      </ListItemIcon>
+                      <Box sx={{ flex: 1, minWidth: 0, overflow: 'hidden' }}>
+                        <Typography noWrap sx={{ fontSize: 12, lineHeight: 1.4 }}>
+                          {w.name || meta?.name || w.type}
+                        </Typography>
+                      </Box>
+                      <Tooltip title={w.locked ? 'Unlock' : 'Lock'}>
+                        <IconButton size="small" sx={{ p: '2px' }}
+                          onClick={(e) => { e.stopPropagation(); toggleWidgetLocked(w.id); }}>
+                          {w.locked
+                            ? <LockIcon sx={{ fontSize: 13, color: 'warning.main' }} />
+                            : <LockOpenIcon sx={{ fontSize: 13, color: 'text.disabled' }} />}
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title={w.hiddenInEdit ? 'Show in editor' : 'Hide in editor'}>
+                        <IconButton size="small" sx={{ p: '2px' }}
+                          onClick={(e) => { e.stopPropagation(); updateWidget(w.id, { hiddenInEdit: !w.hiddenInEdit }); }}>
+                          {w.hiddenInEdit
+                            ? <VisibilityOffIcon sx={{ fontSize: 13, color: 'text.disabled' }} />
+                            : <VisibilityIcon sx={{ fontSize: 13, color: 'text.disabled' }} />}
+                        </IconButton>
+                      </Tooltip>
+                    </ListItemButton>
+                  );
+                })}
+            </List>
+          )}
         </Box>
       )}
 

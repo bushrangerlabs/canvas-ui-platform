@@ -35,6 +35,7 @@ export interface WidgetConfig {
   bindings?: Record<string, string>;
   visibility?: VisibilityConfig;
   hiddenInEdit?: boolean;
+  locked?: boolean;
 }
 
 export interface WidgetProps {

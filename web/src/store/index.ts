@@ -60,6 +60,8 @@ interface EditorState {
   deleteSelected: () => void;
   duplicateSelected: () => void;
   moveSelected: (dx: number, dy: number) => void;
+  alignSelected: (direction: 'left' | 'right' | 'top' | 'bottom' | 'centerX' | 'centerY' | 'distributeX' | 'distributeY') => void;
+  toggleWidgetLocked: (id: string) => void;
 
   // z-order
   bringToFront: (id: string) => void;
@@ -421,6 +423,83 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             s.selectedWidgetIds.includes(w.id)
               ? { ...w, position: { ...w.position, x: w.position.x + dx, y: w.position.y + dy } }
               : w,
+          ),
+        },
+        isDirty: true,
+      };
+    });
+  },
+
+  alignSelected: (direction) => {
+    set((s) => {
+      if (!s.activeView || s.selectedWidgetIds.length < 2) return s;
+      const sel = s.activeView.widgets.filter((w) => s.selectedWidgetIds.includes(w.id));
+      const upd: Record<string, { x?: number; y?: number }> = {};
+
+      if (direction === 'left') {
+        const minX = Math.min(...sel.map((w) => w.position.x));
+        sel.forEach((w) => { upd[w.id] = { x: minX }; });
+      } else if (direction === 'right') {
+        const maxX = Math.max(...sel.map((w) => w.position.x + w.position.width));
+        sel.forEach((w) => { upd[w.id] = { x: maxX - w.position.width }; });
+      } else if (direction === 'top') {
+        const minY = Math.min(...sel.map((w) => w.position.y));
+        sel.forEach((w) => { upd[w.id] = { y: minY }; });
+      } else if (direction === 'bottom') {
+        const maxY = Math.max(...sel.map((w) => w.position.y + w.position.height));
+        sel.forEach((w) => { upd[w.id] = { y: maxY - w.position.height }; });
+      } else if (direction === 'centerX') {
+        const minX = Math.min(...sel.map((w) => w.position.x));
+        const maxX = Math.max(...sel.map((w) => w.position.x + w.position.width));
+        const cx = (minX + maxX) / 2;
+        sel.forEach((w) => { upd[w.id] = { x: cx - w.position.width / 2 }; });
+      } else if (direction === 'centerY') {
+        const minY = Math.min(...sel.map((w) => w.position.y));
+        const maxY = Math.max(...sel.map((w) => w.position.y + w.position.height));
+        const cy = (minY + maxY) / 2;
+        sel.forEach((w) => { upd[w.id] = { y: cy - w.position.height / 2 }; });
+      } else if (direction === 'distributeX') {
+        const sorted = [...sel].sort((a, b) => a.position.x - b.position.x);
+        const minX = sorted[0].position.x;
+        const maxX = sorted[sorted.length - 1].position.x + sorted[sorted.length - 1].position.width;
+        const totalW = sorted.reduce((s, w) => s + w.position.width, 0);
+        const gap = (maxX - minX - totalW) / (sorted.length - 1);
+        let cur = minX;
+        sorted.forEach((w) => { upd[w.id] = { x: cur }; cur += w.position.width + gap; });
+      } else if (direction === 'distributeY') {
+        const sorted = [...sel].sort((a, b) => a.position.y - b.position.y);
+        const minY = sorted[0].position.y;
+        const maxY = sorted[sorted.length - 1].position.y + sorted[sorted.length - 1].position.height;
+        const totalH = sorted.reduce((s, w) => s + w.position.height, 0);
+        const gap = (maxY - minY - totalH) / (sorted.length - 1);
+        let cur = minY;
+        sorted.forEach((w) => { upd[w.id] = { y: cur }; cur += w.position.height + gap; });
+      }
+
+      return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView!)],
+        _future: [],
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.map((w) =>
+            s.selectedWidgetIds.includes(w.id) && upd[w.id]
+              ? { ...w, position: { ...w.position, ...upd[w.id] } }
+              : w,
+          ),
+        },
+        isDirty: true,
+      };
+    });
+  },
+
+  toggleWidgetLocked: (id) => {
+    set((s) => {
+      if (!s.activeView) return s;
+      return {
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.map((w) =>
+            w.id === id ? { ...w, locked: !w.locked } : w,
           ),
         },
         isDirty: true,

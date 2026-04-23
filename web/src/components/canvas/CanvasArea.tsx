@@ -5,6 +5,7 @@
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import LockIcon from '@mui/icons-material/Lock';
 import { useEditorStore } from '../../store';
 import WidgetRenderer from '../widgets/WidgetRenderer';
 import type { WidgetConfig } from '../../types';
@@ -178,6 +179,13 @@ export default function CanvasArea() {
   const onWidgetMouseDown = (e: React.MouseEvent, widget: WidgetConfig) => {
     e.stopPropagation();
 
+    // Locked widgets can still be selected (click) but not dragged
+    if (widget.locked) {
+      if (e.shiftKey) toggleWidgetSelection(widget.id);
+      else selectWidget(widget.id);
+      return;
+    }
+
     if (e.shiftKey) {
       toggleWidgetSelection(widget.id);
       return;
@@ -211,6 +219,7 @@ export default function CanvasArea() {
   const onResizeMouseDown = (e: React.MouseEvent, widget: WidgetConfig, handle: ResizeHandle) => {
     e.stopPropagation();
     e.preventDefault();
+    if (widget.locked) return;
     pushHistorySnapshot();
     resizeRef.current = {
       widgetId: widget.id, handle,
@@ -382,7 +391,7 @@ export default function CanvasArea() {
                   outline: selected
                     ? selectedWidgetIds.length > 1 ? '2px dashed #6c63ff' : '2px solid #6c63ff'
                     : '1px solid transparent',
-                  cursor: 'move',
+                  cursor: w.locked ? 'default' : 'move',
                   boxSizing: 'border-box',
                 }}
               >
@@ -396,6 +405,15 @@ export default function CanvasArea() {
                     pointerEvents: 'none',
                   }}>
                     <VisibilityOffIcon sx={{ color: 'rgba(255,255,255,0.75)', fontSize: 20 }} />
+                  </div>
+                )}
+
+                {w.locked && (
+                  <div style={{
+                    position: 'absolute', top: 2, right: 2,
+                    pointerEvents: 'none',
+                  }}>
+                    <LockIcon sx={{ color: 'rgba(255,200,0,0.85)', fontSize: 13 }} />
                   </div>
                 )}
 

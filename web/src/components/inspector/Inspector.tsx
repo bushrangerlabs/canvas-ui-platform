@@ -16,6 +16,14 @@ import FlipToFrontIcon from '@mui/icons-material/FlipToFront';
 import FlipToBackIcon from '@mui/icons-material/FlipToBack';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import AlignHorizontalLeftIcon from '@mui/icons-material/AlignHorizontalLeft';
+import AlignHorizontalCenterIcon from '@mui/icons-material/AlignHorizontalCenter';
+import AlignHorizontalRightIcon from '@mui/icons-material/AlignHorizontalRight';
+import AlignVerticalTopIcon from '@mui/icons-material/AlignVerticalTop';
+import AlignVerticalCenterIcon from '@mui/icons-material/AlignVerticalCenter';
+import AlignVerticalBottomIcon from '@mui/icons-material/AlignVerticalBottom';
+import DistributeHorizontalIcon from '@mui/icons-material/ViewColumn';
+import DistributeVerticalIcon from '@mui/icons-material/TableRows';
 import { useEditorStore } from '../../store';
 import { WIDGET_REGISTRY } from '../widgets/registry';
 import type { FieldMetadata } from '../widgets/metadata';
@@ -144,20 +152,50 @@ function ViewTab() {
 function WidgetTab() {
   const { activeView, selectedWidgetIds, updateWidget, removeWidget, duplicateWidget,
           bringToFront, sendToBack, bringForward, sendBackward,
-          deleteSelected, duplicateSelected } = useEditorStore();
+          deleteSelected, duplicateSelected, alignSelected } = useEditorStore();
 
   const selectedWidgetId = selectedWidgetIds.length === 1 ? selectedWidgetIds[0] : null;
   const widget = activeView?.widgets.find((w) => w.id === selectedWidgetId);
 
   // Multi-select panel
   if (selectedWidgetIds.length > 1) {
+    const n = selectedWidgetIds.length;
+    const align = (d: Parameters<typeof alignSelected>[0]) => alignSelected(d);
+    const btnSx = { p: '4px', borderRadius: 1, color: 'text.secondary', '&:hover': { color: 'primary.main', bgcolor: 'action.hover' } };
     return (
       <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
         <Typography variant="body2" color="text.secondary">
-          {selectedWidgetIds.length} widgets selected
+          {n} widgets selected
         </Typography>
-        <Button size="small" variant="outlined" onClick={() => duplicateSelected()}>Duplicate All</Button>
-        <Button size="small" variant="outlined" color="error" onClick={() => deleteSelected()}>Delete All</Button>
+
+        <Box>
+          <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>Align</Typography>
+          <Box sx={{ display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Align left edges"><IconButton sx={btnSx} onClick={() => align('left')}><AlignHorizontalLeftIcon fontSize="small" /></IconButton></Tooltip>
+            <Tooltip title="Center horizontally"><IconButton sx={btnSx} onClick={() => align('centerX')}><AlignHorizontalCenterIcon fontSize="small" /></IconButton></Tooltip>
+            <Tooltip title="Align right edges"><IconButton sx={btnSx} onClick={() => align('right')}><AlignHorizontalRightIcon fontSize="small" /></IconButton></Tooltip>
+            <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+            <Tooltip title="Align top edges"><IconButton sx={btnSx} onClick={() => align('top')}><AlignVerticalTopIcon fontSize="small" /></IconButton></Tooltip>
+            <Tooltip title="Center vertically"><IconButton sx={btnSx} onClick={() => align('centerY')}><AlignVerticalCenterIcon fontSize="small" /></IconButton></Tooltip>
+            <Tooltip title="Align bottom edges"><IconButton sx={btnSx} onClick={() => align('bottom')}><AlignVerticalBottomIcon fontSize="small" /></IconButton></Tooltip>
+          </Box>
+        </Box>
+
+        {n >= 3 && (
+          <Box>
+            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 0.5 }}>Distribute</Typography>
+            <Box sx={{ display: 'flex', gap: 0.5 }}>
+              <Tooltip title="Distribute horizontally"><IconButton sx={btnSx} onClick={() => align('distributeX')}><DistributeHorizontalIcon fontSize="small" /></IconButton></Tooltip>
+              <Tooltip title="Distribute vertically"><IconButton sx={btnSx} onClick={() => align('distributeY')}><DistributeVerticalIcon fontSize="small" /></IconButton></Tooltip>
+            </Box>
+          </Box>
+        )}
+
+        <Divider />
+        <Box sx={{ display: 'flex', gap: 1 }}>
+          <Button size="small" variant="outlined" sx={{ flex: 1 }} onClick={() => duplicateSelected()}>Duplicate</Button>
+          <Button size="small" variant="outlined" color="error" sx={{ flex: 1 }} onClick={() => deleteSelected()}>Delete</Button>
+        </Box>
       </Box>
     );
   }
