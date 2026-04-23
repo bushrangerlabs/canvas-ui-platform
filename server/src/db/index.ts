@@ -150,4 +150,22 @@ const migrations: Array<{
       `);
     },
   },
+  {
+    version: 2,
+    name: 'schedules and device schedule_id',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE schedules (
+          id         TEXT PRIMARY KEY,
+          name       TEXT NOT NULL,
+          entries    TEXT NOT NULL DEFAULT '[]',
+          enabled    INTEGER NOT NULL DEFAULT 1,
+          created_at TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        ALTER TABLE devices ADD COLUMN schedule_id TEXT REFERENCES schedules(id) ON DELETE SET NULL;
+      `);
+    },
+  },
 ];

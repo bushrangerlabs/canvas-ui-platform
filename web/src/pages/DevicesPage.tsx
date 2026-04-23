@@ -16,12 +16,13 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
-import type { Device, ServerView } from '../types';
+import type { Device, ServerView, Schedule } from '../types';
 
 export default function DevicesPage() {
   const navigate = useNavigate();
   const [devices, setDevices] = useState<(Device & { online?: boolean })[]>([]);
   const [views, setViews] = useState<ServerView[]>([]);
+  const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -30,6 +31,7 @@ export default function DevicesPage() {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editViewId, setEditViewId] = useState('');
+  const [editScheduleId, setEditScheduleId] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Delete dialog state
@@ -43,8 +45,10 @@ export default function DevicesPage() {
         api.get<(Device & { online?: boolean })[]>('/api/devices'),
         api.get<ServerView[]>('/api/views'),
       ]);
+      const scheds = await api.get<Schedule[]>('/api/schedules').catch(() => [] as Schedule[]);
       setDevices(devs);
       setViews(vws);
+      setSchedules(scheds);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -65,6 +69,7 @@ export default function DevicesPage() {
     setEditName(dev.name);
     setEditDescription(dev.description ?? '');
     setEditViewId(dev.current_view_id ?? '');
+    setEditScheduleId(dev.schedule_id ?? '');
   };
 
   const handleSave = async () => {
@@ -75,6 +80,7 @@ export default function DevicesPage() {
         name: editName.trim() || editDevice.id,
         description: editDescription.trim() || undefined,
         default_view_id: editViewId || null,
+        schedule_id: editScheduleId || null,
       });
       setEditDevice(null);
       load();
@@ -241,6 +247,19 @@ export default function DevicesPage() {
               <MenuItem value="">— None —</MenuItem>
               {views.map((v) => (
                 <MenuItem key={v.id} value={v.id}>{v.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          <FormControl fullWidth size="small">
+            <InputLabel>Schedule (view cycling)</InputLabel>
+            <Select
+              label="Schedule (view cycling)"
+              value={editScheduleId}
+              onChange={(e) => setEditScheduleId(e.target.value)}
+            >
+              <MenuItem value="">— None —</MenuItem>
+              {schedules.map((s) => (
+                <MenuItem key={s.id} value={s.id}>{s.name}{!s.enabled ? ' (disabled)' : ''}</MenuItem>
               ))}
             </Select>
           </FormControl>

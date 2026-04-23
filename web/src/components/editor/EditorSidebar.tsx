@@ -6,6 +6,8 @@ import {
 } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
+import FileUploadIcon from '@mui/icons-material/FileUpload';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
@@ -38,8 +40,41 @@ export default function EditorSidebar() {
   const [collapsedCategories, setCollapsedCategories] = useState<Record<string, boolean>>({});
 
   const { views, activeViewId, openView, createView, deleteView, addWidget, activeView,
-          selectWidget, selectedWidgetIds, toggleWidgetLocked, updateWidget } = useEditorStore();
+          selectWidget, selectedWidgetIds, toggleWidgetLocked, updateWidget, importView } = useEditorStore();
   const [dragLayerId, setDragLayerId] = useState<string | null>(null);
+
+  function handleExportView(e: React.MouseEvent, v: { id: string; name: string; view_data: import('../../types').ViewConfig }) {
+    e.stopPropagation();
+    const json = JSON.stringify(v.view_data, null, 2);
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${v.name.replace(/[^a-z0-9_-]/gi, '_')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function handleImportClick() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.onchange = async (ev) => {
+      const file = (ev.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      try {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        // Accept both a bare ViewConfig and a ServerView export
+        const viewData = data.view_data ?? data;
+        viewData.name = viewData.name ?? file.name.replace(/\.json$/i, '');
+        await importView(viewData);
+      } catch {
+        alert('Failed to import view — invalid JSON.');
+      }
+    };
+    input.click();
+  }
 
   const toggleCategory = (cat: string) =>
     setCollapsedCategories((prev) => ({ ...prev, [cat]: !prev[cat] }));
@@ -102,7 +137,7 @@ export default function EditorSidebar() {
 
       {tab === 0 && (
         <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-          <Box sx={{ p: 1 }}>
+          <Box sx={{ p: 1, display: 'flex', gap: 0.5 }}>
             <Button
               fullWidth
               size="small"
@@ -112,6 +147,11 @@ export default function EditorSidebar() {
             >
               New View
             </Button>
+            <Tooltip title="Import view from JSON">
+              <IconButton size="small" onClick={handleImportClick}>
+                <FileUploadIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
           <List dense sx={{ flex: 1, overflowY: 'auto', py: 0 }}>
             {views.map((v) => (
@@ -125,6 +165,14 @@ export default function EditorSidebar() {
                   primary={v.name}
                   slotProps={{ primary: { noWrap: true, variant: "body2" } }}
                 />
+                <Tooltip title="Export view as JSON">
+                  <IconButton
+                    size="small"
+                    onClick={(e) => handleExportView(e, v)}
+                  >
+                    <FileDownloadIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
                 <Tooltip title="Delete view">
                   <IconButton
                     size="small"

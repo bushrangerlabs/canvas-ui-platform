@@ -1,15 +1,17 @@
-import { Box, AppBar, Toolbar, Typography, Button, Chip, IconButton, Tooltip } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, Button, Chip, IconButton, Tooltip, Popover, List, ListItemButton, ListItemText, Divider } from '@mui/material';
 import SaveIcon from '@mui/icons-material/Save';
 import UndoIcon from '@mui/icons-material/Undo';
 import RedoIcon from '@mui/icons-material/Redo';
+import HistoryIcon from '@mui/icons-material/History';
 import GridOnIcon from '@mui/icons-material/GridOn';
 import GridOffIcon from '@mui/icons-material/GridOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import SettingsIcon from '@mui/icons-material/Settings';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useEditorStore } from '../../store';
 
@@ -20,9 +22,11 @@ interface Props {
 
 export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
   const navigate = useNavigate();
-  const { activeView, isDirty, saveActiveView, snapEnabled, toggleSnap, _past, _future, undo, redo } = useEditorStore();
+  const { activeView, isDirty, saveActiveView, snapEnabled, toggleSnap, _past, _future, undo, redo, jumpToHistory } = useEditorStore();
   const canUndo = _past.length > 0;
   const canRedo = _future.length > 0;
+
+  const [historyAnchor, setHistoryAnchor] = useState<HTMLElement | null>(null);
 
   // Keyboard shortcuts: Ctrl+Z = undo, Ctrl+Shift+Z / Ctrl+Y = redo
   useEffect(() => {
@@ -82,6 +86,12 @@ export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
           </IconButton>
         </Tooltip>
 
+        <Tooltip title="Schedules">
+          <IconButton size="small" onClick={() => navigate('/schedules')}>
+            <CalendarMonthIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
         <Tooltip title="Settings">
           <IconButton size="small" onClick={() => navigate('/settings')}>
             <SettingsIcon fontSize="small" />
@@ -101,6 +111,53 @@ export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
             </IconButton>
           </span>
         </Tooltip>
+
+        <Tooltip title="Undo history">
+          <span>
+            <IconButton
+              size="small"
+              disabled={!canUndo}
+              onClick={(e) => setHistoryAnchor(e.currentTarget)}
+              sx={{ ml: -0.75 }}
+            >
+              <HistoryIcon sx={{ fontSize: 14 }} />
+            </IconButton>
+          </span>
+        </Tooltip>
+
+        <Popover
+          open={Boolean(historyAnchor)}
+          anchorEl={historyAnchor}
+          onClose={() => setHistoryAnchor(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+        >
+          <Box sx={{ width: 240, maxHeight: 360, overflowY: 'auto' }}>
+            <Box sx={{ px: 2, py: 1 }}>
+              <Typography variant="caption" color="text.secondary">Undo history ({_past.length} steps)</Typography>
+            </Box>
+            <Divider />
+            <List dense disablePadding>
+              {[..._past].reverse().map((snapshot, i) => {
+                const realIdx = _past.length - 1 - i;
+                return (
+                  <ListItemButton
+                    key={realIdx}
+                    onClick={() => {
+                      jumpToHistory(realIdx);
+                      setHistoryAnchor(null);
+                    }}
+                  >
+                    <ListItemText
+                      primary={snapshot.name || `Step ${realIdx + 1}`}
+                      secondary={`${snapshot.widgets.length} widget${snapshot.widgets.length !== 1 ? 's' : ''}`}
+                      slotProps={{ primary: { variant: 'body2', noWrap: true } }}
+                    />
+                  </ListItemButton>
+                );
+              })}
+            </List>
+          </Box>
+        </Popover>
 
         <Tooltip title="Redo (Ctrl+Shift+Z)">
           <span>

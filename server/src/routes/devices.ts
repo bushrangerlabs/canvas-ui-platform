@@ -61,7 +61,7 @@ export async function deviceRoutes(app: FastifyInstance) {
     if (!existing) return reply.code(404).send({ error: 'Device not found' });
     const fields: string[] = [];
     const vals: any[] = [];
-    const patchable = ['name', 'description', 'default_view_id', 'screen_on', 'brightness', 'platform'];
+    const patchable = ['name', 'description', 'default_view_id', 'screen_on', 'brightness', 'platform', 'schedule_id'];
     for (const f of patchable) {
       if (body[f] !== undefined) { fields.push(`${f}=?`); vals.push(body[f]); }
     }

@@ -127,9 +127,27 @@ export interface Device {
   name: string;
   description?: string;
   current_view_id?: string;
+  schedule_id?: string;
   connected: boolean;
   last_seen?: string;
   metadata?: Record<string, any>;
+}
+
+// ── Schedules ────────────────────────────────────────────────────────────────
+
+export interface ScheduleEntry {
+  viewId: string;
+  viewName: string;
+  duration: number;   // seconds
+}
+
+export interface Schedule {
+  id: string;
+  name: string;
+  entries: ScheduleEntry[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 // ── WebSocket messages ────────────────────────────────────────────────────────

@@ -27,6 +27,7 @@ interface EditorState {
   pushHistorySnapshot: () => void;
   undo: () => void;
   redo: () => void;
+  jumpToHistory: (index: number) => void;
 
   // ── snap-to-grid ─────────────────────────────────────────────────────────
   snapEnabled: boolean;
@@ -37,6 +38,7 @@ interface EditorState {
   loadViews: () => Promise<void>;
   openView: (id: string) => Promise<void>;
   createView: (name: string) => Promise<string>;
+  importView: (viewData: ViewConfig) => Promise<string>;
   saveActiveView: () => Promise<void>;
   deleteView: (id: string) => Promise<void>;
 
@@ -125,6 +127,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
 
+  jumpToHistory: (index) => {
+    set((s) => {
+      if (!s.activeView || index < 0 || index >= s._past.length) return s;
+      const target = s._past[index];
+      return {
+        _past: s._past.slice(0, index),
+        _future: [...s._past.slice(index + 1), structuredClone(s.activeView), ...s._future].slice(0, 50),
+        activeView: structuredClone(target),
+        isDirty: true,
+      };
+    });
+  },
+
   snapEnabled: false,
   snapSize: 10,
   toggleSnap: () => set((s) => ({ snapEnabled: !s.snapEnabled })),
@@ -172,6 +187,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeView: structuredClone(sv.view_data),
       isDirty: false,
       selectedWidgetIds: [],
+    }));
+    return sv.id;
+  },
+
+  importView: async (viewData) => {
+    const name = viewData.name || 'Imported View';
+    const sv = await viewsApi.create({ name, view_data: viewData });
+    set((s) => ({
+      views: [...s.views, sv],
+      activeViewId: sv.id,
+      activeView: structuredClone(sv.view_data),
+      isDirty: false,
+      selectedWidgetIds: [],
+      _past: [],
+      _future: [],
     }));
     return sv.id;
   },
