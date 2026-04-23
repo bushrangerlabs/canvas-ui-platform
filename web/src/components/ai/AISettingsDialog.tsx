@@ -19,11 +19,14 @@ import {
   Radio,
   RadioGroup,
   Select,
+  Tab,
+  Tabs,
   TextField,
   Typography,
 } from '@mui/material';
 import React, { useEffect, useState } from 'react';
 import { aiService, type AIProvider, type AISettings } from '../../services/ai/AIService';
+import { promptTemplateStore, type PromptTemplates } from '../../services/ai/PromptTemplateStore';
 
 interface Props {
   open: boolean;
@@ -41,6 +44,13 @@ const PROVIDERS: { value: AIProvider; label: string; desc: string }[] = [
 
 const EMPTY: Partial<AISettings> = {};
 
+const PROMPT_SECTIONS: { key: keyof PromptTemplates; label: string; desc: string }[] = [
+  { key: 'systemPromptCreate', label: 'Create Prompt', desc: 'System instructions when building a new dashboard from scratch' },
+  { key: 'systemPromptEdit',   label: 'Edit Prompt',   desc: 'System instructions when modifying an existing dashboard' },
+  { key: 'widgetCatalog',      label: 'Widget Catalog', desc: 'Auto-generated — edit to add hints or correct AI mistakes' },
+  { key: 'outputFormat',       label: 'Output Format',  desc: 'JSON structure the AI must follow' },
+];
+
 export const AISettingsDialog: React.FC<Props> = ({ open, onClose }) => {
   const [settings, setSettings] = useState<Partial<AISettings>>(EMPTY);
   const [models, setModels] = useState<string[]>([]);
@@ -48,6 +58,11 @@ export const AISettingsDialog: React.FC<Props> = ({ open, onClose }) => {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [saved, setSaved] = useState(false);
+  const [activeTab, setActiveTab] = useState(0);
+
+  // Prompt templates state
+  const [templates, setTemplates] = useState<PromptTemplates>(() => promptTemplateStore.getTemplates());
+  const [promptTab, setPromptTab] = useState(0);
 
   // Pending raw key values (never sent to GET, stored separately via /key endpoint)
   const [pendingKeys, setPendingKeys] = useState<Partial<Record<keyof AISettings, string>>>({});
@@ -57,6 +72,9 @@ export const AISettingsDialog: React.FC<Props> = ({ open, onClose }) => {
     setError('');
     setSaved(false);
     setPendingKeys({});
+    setActiveTab(0);
+    setPromptTab(0);
+    setTemplates(promptTemplateStore.getTemplates());
     aiService.loadSettings().then(s => setSettings(s));
   }, [open]);
 
@@ -108,6 +126,8 @@ export const AISettingsDialog: React.FC<Props> = ({ open, onClose }) => {
         ai_copilotproxy_url: settings.ai_copilotproxy_url,
         ai_timeout_ms: settings.ai_timeout_ms,
       });
+      // Save prompt templates
+      promptTemplateStore.saveTemplates(templates);
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (e) {
@@ -122,12 +142,18 @@ export const AISettingsDialog: React.FC<Props> = ({ open, onClose }) => {
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth slotProps={{ paper: { sx: { bgcolor: '#1e1e2e' } } }}>
-      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'white' }}>
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1, color: 'white', pb: 0 }}>
         <SmartToyIcon /> AI Settings
       </DialogTitle>
+      <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{ px: 2, borderBottom: '1px solid #333' }}>
+        <Tab label="Provider" sx={{ fontSize: 12, minHeight: 36 }} />
+        <Tab label="Prompts" sx={{ fontSize: 12, minHeight: 36 }} />
+      </Tabs>
       <DialogContent dividers sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, pt: 2 }}>
         {error && <Alert severity="error" sx={{ fontSize: 12 }}>{error}</Alert>}
         {saved && <Alert severity="success" sx={{ fontSize: 12 }}>Settings saved</Alert>}
+
+        {activeTab === 0 && (<>
 
         {/* Provider */}
         <FormControl>
@@ -291,6 +317,46 @@ export const AISettingsDialog: React.FC<Props> = ({ open, onClose }) => {
           slotProps={{ input: { sx: { fontSize: 13 } } }}
           helperText="Default 180000 (3 min). Increase for slow models."
         />
+        </>)}
+
+        {activeTab === 1 && (
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Typography sx={{ fontSize: 12, color: '#aaa' }}>Customise prompts sent to the AI model</Typography>
+              <Button
+                size="small"
+                onClick={() => {
+                  if (confirm('Reset all prompts to defaults?')) {
+                    promptTemplateStore.resetToDefaults();
+                    setTemplates(promptTemplateStore.getTemplates());
+                  }
+                }}
+                sx={{ fontSize: 11 }}
+              >
+                Reset to defaults
+              </Button>
+            </Box>
+            <Tabs value={promptTab} onChange={(_, v) => setPromptTab(v)} variant="scrollable" scrollButtons="auto" sx={{ minHeight: 32, borderBottom: '1px solid #333' }}>
+              {PROMPT_SECTIONS.map(s => (
+                <Tab key={s.key} label={s.label} sx={{ fontSize: 11, minHeight: 32, py: 0 }} />
+              ))}
+            </Tabs>
+            {PROMPT_SECTIONS.map((s, i) => promptTab === i && (
+              <Box key={s.key} sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                <Typography sx={{ fontSize: 11, color: '#777' }}>{s.desc}</Typography>
+                <TextField
+                  multiline
+                  minRows={12}
+                  maxRows={20}
+                  fullWidth
+                  value={templates[s.key]}
+                  onChange={e => setTemplates(t => ({ ...t, [s.key]: e.target.value }))}
+                  slotProps={{ input: { sx: { fontSize: 12, fontFamily: 'monospace' } } }}
+                />
+              </Box>
+            ))}
+          </Box>
+        )}
       </DialogContent>
       <DialogActions sx={{ px: 2 }}>
         <Button onClick={onClose} size="small" sx={{ fontSize: 12 }}>Cancel</Button>
