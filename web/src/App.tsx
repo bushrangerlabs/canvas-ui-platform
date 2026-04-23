@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
 import { HAEntitiesProvider } from './context/HAEntitiesContext';
+import { DataSourceValuesProvider } from './context/DataSourceValuesContext';
 import EditorPage from './pages/EditorPage';
 import DisplayPage from './pages/DisplayPage';
 import DevicesPage from './pages/DevicesPage';
@@ -34,6 +35,7 @@ export default function App() {
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
       <HAEntitiesProvider>
+        <DataSourceValuesProvider>
         <BrowserRouter basename={getBasename()}>
           <Routes>
             <Route path="/" element={<Navigate to="/editor" replace />} />
@@ -44,6 +46,7 @@ export default function App() {
             <Route path="/settings" element={<SettingsPage />} />
           </Routes>
         </BrowserRouter>
+        </DataSourceValuesProvider>
       </HAEntitiesProvider>
     </ThemeProvider>
   );

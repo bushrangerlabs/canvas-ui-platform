@@ -313,6 +313,57 @@ function WidgetTab() {
         );
       })}
 
+      {/* Data Bindings accordion */}
+      <Accordion disableGutters square elevation={0}
+        sx={{ borderBottom: 1, borderColor: 'divider', '&::before': { display: 'none' } }}>
+        <AccordionSummary expandIcon={<ExpandMoreIcon />}
+          sx={{ minHeight: 36, '& .MuiAccordionSummary-content': { my: 0.5 } }}>
+          <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5 }}>BINDINGS</Typography>
+        </AccordionSummary>
+        <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 1.5 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+            <Typography variant="caption" color="text.secondary" sx={{ fontSize: 10 }}>
+              Bind widget fields to platform data source values (format: sourceId.key)
+            </Typography>
+            {Object.entries(widget.bindings ?? {}).map(([field, ref]) => (
+              <Box key={field} sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+                <TextField size="small" label="Field" value={field} sx={{ flex: 1 }}
+                  onChange={(e) => {
+                    const newBindings = { ...widget.bindings };
+                    delete newBindings[field];
+                    newBindings[e.target.value] = ref;
+                    updateWidget(widget.id, { bindings: newBindings });
+                  }}
+                />
+                <TextField size="small" label="sourceId.key" value={ref} sx={{ flex: 2 }}
+                  onChange={(e) => {
+                    updateWidget(widget.id, { bindings: { ...widget.bindings, [field]: e.target.value } });
+                  }}
+                />
+                <IconButton size="small" color="error"
+                  onClick={() => {
+                    const newBindings = { ...widget.bindings };
+                    delete newBindings[field];
+                    updateWidget(widget.id, { bindings: newBindings });
+                  }}
+                >
+                  <DeleteIcon fontSize="small" />
+                </IconButton>
+              </Box>
+            ))}
+            <Button size="small" variant="outlined" sx={{ mt: 0.5, fontSize: 11 }}
+              onClick={() => {
+                const existing = widget.bindings ?? {};
+                const newKey = `field_${Object.keys(existing).length + 1}`;
+                updateWidget(widget.id, { bindings: { ...existing, [newKey]: '' } });
+              }}
+            >
+              + Add Binding
+            </Button>
+          </Box>
+        </AccordionDetails>
+      </Accordion>
+
       {/* Visibility / show-hide accordion */}
       <Accordion disableGutters square elevation={0}
         sx={{ borderBottom: 1, borderColor: 'divider', '&::before': { display: 'none' } }}>

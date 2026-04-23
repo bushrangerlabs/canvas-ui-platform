@@ -919,3 +919,88 @@ export const WIDGET_CATALOG: Record<string, WidgetMetadata> = {
   border: BorderWidgetMetadata,
   shape: ShapeWidgetMetadata,
 };
+
+// ─── Additional Widgets ──────────────────────────────────────────────────────
+
+const ScrollableContainerWidgetMetadata: WidgetMetadata = {
+  name: 'Scrollable Container',
+  icon: 'TableChartOutlined',
+  category: 'layout',
+  description: 'A scrollable styled container panel. Place other widgets on top using normal canvas positioning.',
+  defaultSize: { w: 500, h: 400 },
+  minSize: { w: 100, h: 100 },
+  requiresEntity: false,
+  fields: [
+    { name: 'width', type: 'number', label: 'Width', default: 500, min: 100, category: 'layout' },
+    { name: 'height', type: 'number', label: 'Height', default: 400, min: 100, category: 'layout' },
+    { name: 'label', type: 'text', label: 'Label', default: '', category: 'behavior' },
+    { name: 'scrollDirection', type: 'select', label: 'Scroll Direction', default: 'vertical', category: 'behavior', options: [
+      { value: 'vertical', label: 'Vertical' },
+      { value: 'horizontal', label: 'Horizontal' },
+      { value: 'both', label: 'Both' },
+      { value: 'none', label: 'None' },
+    ]},
+    { name: 'showScrollbar', type: 'checkbox', label: 'Show Scrollbar', default: true, category: 'behavior' },
+    { name: 'backgroundColor', type: 'color', label: 'Background Color', default: 'rgba(255,255,255,0.05)', category: 'style' },
+    { name: 'borderColor', type: 'color', label: 'Border Color', default: 'rgba(255,255,255,0.1)', category: 'style' },
+    { name: 'borderWidth', type: 'number', label: 'Border Width', default: 1, min: 0, max: 10, category: 'style' },
+    { name: 'borderRadius', type: 'number', label: 'Border Radius', default: 8, min: 0, max: 50, category: 'style' },
+    { name: 'padding', type: 'number', label: 'Padding', default: 8, min: 0, max: 80, category: 'style' },
+    { name: 'labelColor', type: 'color', label: 'Label Color', default: '#888888', category: 'style' },
+    { name: 'labelSize', type: 'number', label: 'Label Font Size', default: 12, min: 8, max: 32, category: 'style' },
+  ],
+};
+
+const KeyboardWidgetMetadata: WidgetMetadata = {
+  name: 'Keyboard',
+  icon: 'KeyboardOutlined',
+  category: 'control',
+  description: 'On-screen virtual keyboard for text input. Syncs with focused inputs and/or an input_text entity.',
+  defaultSize: { w: 700, h: 260 },
+  minSize: { w: 400, h: 180 },
+  requiresEntity: false,
+  fields: [
+    { name: 'width', type: 'number', label: 'Width', default: 700, min: 400, category: 'layout' },
+    { name: 'height', type: 'number', label: 'Height', default: 260, min: 180, category: 'layout' },
+    { name: 'layout', type: 'select', label: 'Layout', default: 'default', category: 'behavior', options: [
+      { value: 'default', label: 'QWERTY' },
+      { value: 'numeric', label: 'Numeric Pad' },
+    ]},
+    { name: 'target_entity', type: 'entity', label: 'Target Entity (input_text)', default: '', category: 'behavior' },
+    { name: 'showDisplay', type: 'checkbox', label: 'Show Input Display', default: true, category: 'behavior' },
+    { name: 'backgroundColor', type: 'color', label: 'Background Color', default: '#1e1e1e', category: 'style' },
+    { name: 'buttonColor', type: 'color', label: 'Button Color', default: '#3b3b3b', category: 'style' },
+    { name: 'buttonTextColor', type: 'color', label: 'Button Text Color', default: '#ffffff', category: 'style' },
+    { name: 'buttonHoverColor', type: 'color', label: 'Button Hover Color', default: '#5a5a5a', category: 'style' },
+    { name: 'displayBackgroundColor', type: 'color', label: 'Display Background', default: '#2a2a2a', category: 'style' },
+    { name: 'displayTextColor', type: 'color', label: 'Display Text Color', default: '#ffffff', category: 'style' },
+  ],
+};
+
+const ScreensaverWidgetMetadata: WidgetMetadata = {
+  name: 'Screensaver',
+  icon: 'BedtimeOutlined',
+  category: 'display',
+  description: 'Idle timer that shows a dim or black overlay after inactivity. Dismiss by touching or pressing a key.',
+  defaultSize: { w: 160, h: 80 },
+  minSize: { w: 80, h: 50 },
+  requiresEntity: false,
+  fields: [
+    { name: 'width', type: 'number', label: 'Width', default: 160, min: 80, category: 'layout' },
+    { name: 'height', type: 'number', label: 'Height', default: 80, min: 50, category: 'layout' },
+    { name: 'idleTimeout', type: 'number', label: 'Idle Timeout (sec)', default: 120, min: 5, max: 3600, category: 'behavior' },
+    { name: 'mode', type: 'select', label: 'Mode', default: 'dim', category: 'behavior', options: [
+      { value: 'dim', label: 'Dim overlay' },
+      { value: 'black', label: 'Full black' },
+    ]},
+    { name: 'dismissOnTouch', type: 'checkbox', label: 'Dismiss on Touch/Click', default: true, category: 'behavior' },
+    { name: 'dismissOnKeyboard', type: 'checkbox', label: 'Dismiss on Keypress', default: true, category: 'behavior' },
+    { name: 'dimOpacity', type: 'slider', label: 'Dim Opacity (%)', default: 85, min: 10, max: 100, step: 5, category: 'style' },
+    { name: 'overlayColor', type: 'color', label: 'Overlay Color', default: '#000000', category: 'style' },
+  ],
+};
+
+// Extend registry
+(WIDGET_CATALOG as Record<string, WidgetMetadata>)['scrollablecontainer'] = ScrollableContainerWidgetMetadata;
+(WIDGET_CATALOG as Record<string, WidgetMetadata>)['keyboard'] = KeyboardWidgetMetadata;
+(WIDGET_CATALOG as Record<string, WidgetMetadata>)['screensaver'] = ScreensaverWidgetMetadata;

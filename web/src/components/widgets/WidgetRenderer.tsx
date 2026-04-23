@@ -60,6 +60,10 @@ const widgetMap: Record<string, React.LazyExoticComponent<React.FC<WidgetProps>>
   graph: lazy(() => import('./GraphWidget')),
   camera: lazy(() => import('./CameraWidget')),
   calendar: lazy(() => import('./CalendarWidget')),
+  // Additional
+  scrollablecontainer: lazy(() => import('./ScrollableContainerWidget')),
+  keyboard: lazy(() => import('./KeyboardWidget')),
+  screensaver: lazy(() => import('./ScreensaverWidget')),
 };
 
 export default function WidgetRenderer(props: WidgetProps) {
