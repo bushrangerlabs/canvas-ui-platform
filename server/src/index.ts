@@ -14,6 +14,7 @@ import { imageRoutes } from './routes/images';
 import { serverRoutes } from './routes/server';
 import { haRoutes } from './routes/ha';
 import { scheduleRoutes } from './routes/schedules';
+import { aiRoutes } from './routes/ai';
 
 async function main() {
   // ── Database ──────────────────────────────────────────────────────────────
@@ -37,6 +38,7 @@ async function main() {
   await app.register(serverRoutes,     { prefix: '/api' });
   await app.register(haRoutes,         { prefix: '/api' });
   await app.register(scheduleRoutes,   { prefix: '/api' });
+  await app.register(aiRoutes,         { prefix: '/api/ai' });
 
   // ── Serve web SPA (editor + display) ─────────────────────────────────────
   const webRoot = path.join(__dirname, '..', 'public');

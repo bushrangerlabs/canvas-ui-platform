@@ -13,12 +13,14 @@ import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ViewQuiltIcon from '@mui/icons-material/ViewQuilt';
 import WidgetsIcon from '@mui/icons-material/Widgets';
 import LayersIcon from '@mui/icons-material/Layers';
+import SmartToyOutlinedIcon from '@mui/icons-material/SmartToyOutlined';
 import LockIcon from '@mui/icons-material/Lock';
 import LockOpenIcon from '@mui/icons-material/LockOpen';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import { useEditorStore } from '../../store';
+import { AIPanel } from '../ai/AIPanel';
 import { WIDGET_REGISTRY } from '../widgets/registry';
 import WidgetIcon from '../WidgetIcon';
 import type { WidgetConfig } from '../../types';
@@ -132,6 +134,7 @@ export default function EditorSidebar() {
         <Tab icon={<ViewQuiltIcon fontSize="small" />} iconPosition="start" label="Views" sx={{ minHeight: 40, fontSize: 11 }} />
         <Tab icon={<WidgetsIcon fontSize="small" />} iconPosition="start" label="Widgets" sx={{ minHeight: 40, fontSize: 11 }} />
         <Tab icon={<LayersIcon fontSize="small" />} iconPosition="start" label="Layers" sx={{ minHeight: 40, fontSize: 11 }} />
+        <Tab icon={<SmartToyOutlinedIcon fontSize="small" />} iconPosition="start" label="AI" sx={{ minHeight: 40, fontSize: 11 }} />
       </Tabs>
       <Divider />
 
@@ -326,6 +329,12 @@ export default function EditorSidebar() {
                 })}
             </List>
           )}
+        </Box>
+      )}
+
+      {tab === 3 && (
+        <Box sx={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden', position: 'relative' }}>
+          <AIPanel />
         </Box>
       )}
 
