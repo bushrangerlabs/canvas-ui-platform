@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import {
   Accordion, AccordionDetails, AccordionSummary,
   Box, Checkbox, Divider, FormControl, FormControlLabel,
-  IconButton, InputLabel, MenuItem, Select, Slider, Tab, Tabs,
+  Button, IconButton, InputLabel, MenuItem, Select, Slider, Tab, Tabs,
   TextField, Tooltip, Typography,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
@@ -142,10 +142,25 @@ function ViewTab() {
 // ── Widget tab ────────────────────────────────────────────────────────────────
 
 function WidgetTab() {
-  const { activeView, selectedWidgetId, updateWidget, removeWidget, duplicateWidget,
-          bringToFront, sendToBack, bringForward, sendBackward } = useEditorStore();
+  const { activeView, selectedWidgetIds, updateWidget, removeWidget, duplicateWidget,
+          bringToFront, sendToBack, bringForward, sendBackward,
+          deleteSelected, duplicateSelected } = useEditorStore();
 
+  const selectedWidgetId = selectedWidgetIds.length === 1 ? selectedWidgetIds[0] : null;
   const widget = activeView?.widgets.find((w) => w.id === selectedWidgetId);
+
+  // Multi-select panel
+  if (selectedWidgetIds.length > 1) {
+    return (
+      <Box sx={{ p: 2, display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <Typography variant="body2" color="text.secondary">
+          {selectedWidgetIds.length} widgets selected
+        </Typography>
+        <Button size="small" variant="outlined" onClick={() => duplicateSelected()}>Duplicate All</Button>
+        <Button size="small" variant="outlined" color="error" onClick={() => deleteSelected()}>Delete All</Button>
+      </Box>
+    );
+  }
   const meta = widget ? WIDGET_REGISTRY[widget.type] : undefined;
 
   if (!widget || !meta) {
@@ -413,13 +428,13 @@ function renderField(
 // ── Root Inspector ────────────────────────────────────────────────────────────
 
 export default function Inspector() {
-  const { selectedWidgetId } = useEditorStore();
+  const { selectedWidgetIds } = useEditorStore();
   const [tab, setTab] = useState<'view' | 'widget'>('view');
 
   // Auto-switch to Widget tab when a widget is selected on the canvas
   useEffect(() => {
-    if (selectedWidgetId) setTab('widget');
-  }, [selectedWidgetId]);
+    if (selectedWidgetIds.length > 0) setTab('widget');
+  }, [selectedWidgetIds.length]);
 
   return (
     <Box
@@ -438,7 +453,7 @@ export default function Inspector() {
       >
         <Tab label="View" value="view" sx={{ minHeight: 40, fontSize: 12 }} />
         <Tab label="Widget" value="widget" sx={{ minHeight: 40, fontSize: 12 }}
-          onClick={() => selectedWidgetId && setTab('widget')} />
+          onClick={() => selectedWidgetIds.length > 0 && setTab('widget')} />
       </Tabs>
 
       <Box sx={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>

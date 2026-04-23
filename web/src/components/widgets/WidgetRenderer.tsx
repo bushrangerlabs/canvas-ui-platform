@@ -59,6 +59,7 @@ const widgetMap: Record<string, React.LazyExoticComponent<React.FC<WidgetProps>>
   weather: lazy(() => import('./WeatherWidget')),
   graph: lazy(() => import('./GraphWidget')),
   camera: lazy(() => import('./CameraWidget')),
+  calendar: lazy(() => import('./CalendarWidget')),
 };
 
 export default function WidgetRenderer(props: WidgetProps) {

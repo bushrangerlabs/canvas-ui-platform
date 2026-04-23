@@ -1,5 +1,6 @@
 /**
  * CanvasArea — editor canvas with widget drag, resize, selection, and zoom.
+ * Supports multi-select (Shift+click, rubber-band), copy/paste, keyboard shortcuts.
  */
 import { useRef, useState, useCallback, useEffect } from 'react';
 import { Box, Typography } from '@mui/material';
@@ -14,12 +15,11 @@ const MIN_SIZE = 20;
 
 type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'nw' | 'ne' | 'sw' | 'se';
 
-interface DragState {
-  widgetId: string;
-  startX: number;
-  startY: number;
-  origX: number;
-  origY: number;
+// Multi-drag: track all selected widgets' original positions together
+interface MultiDragState {
+  startClientX: number;
+  startClientY: number;
+  origPositions: Record<string, { x: number; y: number }>;
 }
 
 interface ResizeState {
@@ -31,6 +31,14 @@ interface ResizeState {
   origY: number;
   origW: number;
   origH: number;
+}
+
+// Rubber-band selection in canvas-space coordinates
+interface RubberBand {
+  startCX: number;
+  startCY: number;
+  curCX: number;
+  curCY: number;
 }
 
 const HANDLE_DEFS: { handle: ResizeHandle; cursor: string; style: React.CSSProperties }[] = [
@@ -45,18 +53,56 @@ const HANDLE_DEFS: { handle: ResizeHandle; cursor: string; style: React.CSSPrope
 ];
 
 export default function CanvasArea() {
-  const { activeView, selectedWidgetId, selectWidget, updateWidget, snapEnabled, snapSize, pushHistorySnapshot } = useEditorStore();
+  const {
+    activeView,
+    selectedWidgetIds,
+    selectWidget,
+    toggleWidgetSelection,
+    selectAllWidgets,
+    clearSelection,
+    copySelected,
+    pasteClipboard,
+    deleteSelected,
+    duplicateSelected,
+    updateWidget,
+    snapEnabled,
+    snapSize,
+    pushHistorySnapshot,
+  } = useEditorStore();
+
   const snap = (v: number) => snapEnabled ? Math.round(v / snapSize) * snapSize : Math.round(v);
+
   const [zoom, setZoom] = useState(0.5);
   const [pan, setPan] = useState({ x: 20, y: 20 });
-  const dragRef = useRef<DragState | null>(null);
+  const [rubberBand, setRubberBand] = useState<RubberBand | null>(null);
+
+  const multiDragRef = useRef<MultiDragState | null>(null);
   const resizeRef = useRef<ResizeState | null>(null);
   const panDragRef = useRef<{ startX: number; startY: number; origPan: { x: number; y: number } } | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Auto-fit zoom when canvas or container size changes
+  // Stable refs for values used inside non-React event handlers
   const activeViewRef = useRef(activeView);
   activeViewRef.current = activeView;
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const panRef = useRef(pan);
+  panRef.current = pan;
+  const selectedWidgetIdsRef = useRef(selectedWidgetIds);
+  selectedWidgetIdsRef.current = selectedWidgetIds;
+
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  const clientToCanvas = useCallback((clientX: number, clientY: number) => {
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect) return { cx: 0, cy: 0 };
+    return {
+      cx: (clientX - rect.left - panRef.current.x) / zoomRef.current,
+      cy: (clientY - rect.top - panRef.current.y) / zoomRef.current,
+    };
+  }, []);
+
+  // ── Auto-fit ───────────────────────────────────────────────────────────────
 
   const fitToContainer = useCallback(() => {
     const el = containerRef.current;
@@ -66,28 +112,19 @@ export default function CanvasArea() {
     const szx = view.sizex ?? 1920;
     const szy = view.sizey ?? 1080;
     const padding = 40;
-    const fitZoom = Math.min(
-      (width - padding * 2) / szx,
-      (height - padding * 2) / szy,
-      MAX_ZOOM
-    );
+    const fitZoom = Math.min((width - padding * 2) / szx, (height - padding * 2) / szy, MAX_ZOOM);
     const clamped = Math.max(MIN_ZOOM, parseFloat(fitZoom.toFixed(2)));
     setZoom(clamped);
-    // Centre the scaled view; fall back to padding if it overflows
     const scaledW = szx * clamped;
     const scaledH = szy * clamped;
     setPan({
       x: Math.max(padding, (width - scaledW) / 2),
       y: Math.max(padding, (height - scaledH) / 2),
     });
-  }, []); // stable — reads from refs
+  }, []);
 
-  // Re-fit when view changes
-  useEffect(() => {
-    fitToContainer();
-  }, [activeView?.id, fitToContainer]);
+  useEffect(() => { fitToContainer(); }, [activeView?.id, fitToContainer]);
 
-  // Re-fit when container resizes (sidebar collapse/expand)
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -95,6 +132,8 @@ export default function CanvasArea() {
     ro.observe(el);
     return () => ro.disconnect();
   }, [fitToContainer]);
+
+  // ── Zoom via Ctrl+wheel ────────────────────────────────────────────────────
 
   const handleWheel = useCallback((e: WheelEvent) => {
     if (e.ctrlKey || e.metaKey) {
@@ -110,48 +149,90 @@ export default function CanvasArea() {
     return () => el.removeEventListener('wheel', handleWheel);
   }, [handleWheel]);
 
-  // ── Widget drag ────────────────────────────────────────────────────────────
+  // ── Keyboard shortcuts ─────────────────────────────────────────────────────
+
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+      const ctrl = e.ctrlKey || e.metaKey;
+
+      if (ctrl && e.key === 'a') { e.preventDefault(); selectAllWidgets(); }
+      else if (ctrl && e.key === 'c') { e.preventDefault(); copySelected(); }
+      else if (ctrl && e.key === 'v') { e.preventDefault(); pasteClipboard(); }
+      else if (ctrl && e.key === 'd') { e.preventDefault(); duplicateSelected(); }
+      else if (ctrl && e.key === 'z' && !e.shiftKey) { e.preventDefault(); useEditorStore.getState().undo(); }
+      else if (ctrl && (e.key === 'y' || (e.shiftKey && e.key === 'z'))) { e.preventDefault(); useEditorStore.getState().redo(); }
+      else if ((e.key === 'Delete' || e.key === 'Backspace') && selectedWidgetIdsRef.current.length > 0) {
+        e.preventDefault();
+        deleteSelected();
+      }
+      else if (e.key === 'Escape') { clearSelection(); }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [selectAllWidgets, copySelected, pasteClipboard, duplicateSelected, deleteSelected, clearSelection]);
+
+  // ── Widget mouse down ──────────────────────────────────────────────────────
+
   const onWidgetMouseDown = (e: React.MouseEvent, widget: WidgetConfig) => {
     e.stopPropagation();
-    selectWidget(widget.id);
+
+    if (e.shiftKey) {
+      toggleWidgetSelection(widget.id);
+      return;
+    }
+
+    // If not in selection, clear and select just this widget
+    if (!selectedWidgetIdsRef.current.includes(widget.id)) {
+      selectWidget(widget.id);
+    }
+
+    // Build origPositions snapshot for all currently selected widgets
+    const ids = selectedWidgetIdsRef.current.includes(widget.id)
+      ? selectedWidgetIdsRef.current
+      : [widget.id];
+
+    const view = activeViewRef.current;
+    if (!view) return;
+
+    const origPositions: Record<string, { x: number; y: number }> = {};
+    for (const wid of ids) {
+      const w = view.widgets.find((ww) => ww.id === wid);
+      if (w) origPositions[wid] = { x: w.position.x, y: w.position.y };
+    }
+
     pushHistorySnapshot();
-    dragRef.current = {
-      widgetId: widget.id,
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: widget.position.x,
-      origY: widget.position.y,
-    };
+    multiDragRef.current = { startClientX: e.clientX, startClientY: e.clientY, origPositions };
   };
 
-  // ── Resize drag ────────────────────────────────────────────────────────────
+  // ── Resize mouse down ──────────────────────────────────────────────────────
+
   const onResizeMouseDown = (e: React.MouseEvent, widget: WidgetConfig, handle: ResizeHandle) => {
     e.stopPropagation();
     e.preventDefault();
     pushHistorySnapshot();
     resizeRef.current = {
-      widgetId: widget.id,
-      handle,
-      startX: e.clientX,
-      startY: e.clientY,
-      origX: widget.position.x,
-      origY: widget.position.y,
-      origW: widget.position.width,
-      origH: widget.position.height,
+      widgetId: widget.id, handle,
+      startX: e.clientX, startY: e.clientY,
+      origX: widget.position.x, origY: widget.position.y,
+      origW: widget.position.width, origH: widget.position.height,
     };
   };
 
+  // ── Mouse move ─────────────────────────────────────────────────────────────
+
   const onMouseMove = (e: React.MouseEvent) => {
-    if (dragRef.current) {
-      const dx = (e.clientX - dragRef.current.startX) / zoom;
-      const dy = (e.clientY - dragRef.current.startY) / zoom;
-      updateWidget(dragRef.current.widgetId, {
-        position: {
-          ...activeView!.widgets.find((w) => w.id === dragRef.current!.widgetId)!.position,
-          x: snap(dragRef.current.origX + dx),
-          y: snap(dragRef.current.origY + dy),
-        },
-      });
+    if (multiDragRef.current) {
+      const md = multiDragRef.current;
+      const dx = (e.clientX - md.startClientX) / zoom;
+      const dy = (e.clientY - md.startClientY) / zoom;
+      const view = activeViewRef.current;
+      if (!view) return;
+      for (const [wid, orig] of Object.entries(md.origPositions)) {
+        const w = view.widgets.find((ww) => ww.id === wid);
+        if (w) updateWidget(wid, { position: { ...w.position, x: snap(orig.x + dx), y: snap(orig.y + dy) } });
+      }
     }
 
     if (resizeRef.current) {
@@ -159,44 +240,70 @@ export default function CanvasArea() {
       const dx = (e.clientX - r.startX) / zoom;
       const dy = (e.clientY - r.startY) / zoom;
       let { origX: x, origY: y, origW: w, origH: h } = r;
-
       if (r.handle.includes('e')) w = Math.max(MIN_SIZE, snap(r.origW + dx));
       if (r.handle.includes('s')) h = Math.max(MIN_SIZE, snap(r.origH + dy));
-      if (r.handle.includes('w')) {
-        const newW = Math.max(MIN_SIZE, snap(r.origW - dx));
-        x = snap(r.origX + r.origW - newW);
-        w = newW;
-      }
-      if (r.handle.includes('n')) {
-        const newH = Math.max(MIN_SIZE, snap(r.origH - dy));
-        y = snap(r.origY + r.origH - newH);
-        h = newH;
-      }
-
-      const orig = activeView!.widgets.find((ww) => ww.id === r.widgetId)!;
-      updateWidget(r.widgetId, {
-        position: { ...orig.position, x, y, width: w, height: h },
-      });
+      if (r.handle.includes('w')) { const nw = Math.max(MIN_SIZE, snap(r.origW - dx)); x = snap(r.origX + r.origW - nw); w = nw; }
+      if (r.handle.includes('n')) { const nh = Math.max(MIN_SIZE, snap(r.origH - dy)); y = snap(r.origY + r.origH - nh); h = nh; }
+      const orig = activeViewRef.current?.widgets.find((ww) => ww.id === r.widgetId);
+      if (orig) updateWidget(r.widgetId, { position: { ...orig.position, x, y, width: w, height: h } });
     }
 
     if (panDragRef.current) {
-      const dx = e.clientX - panDragRef.current.startX;
-      const dy = e.clientY - panDragRef.current.startY;
-      setPan({ x: panDragRef.current.origPan.x + dx, y: panDragRef.current.origPan.y + dy });
+      setPan({
+        x: panDragRef.current.origPan.x + (e.clientX - panDragRef.current.startX),
+        y: panDragRef.current.origPan.y + (e.clientY - panDragRef.current.startY),
+      });
+    }
+
+    if (rubberBand) {
+      const { cx, cy } = clientToCanvas(e.clientX, e.clientY);
+      setRubberBand((rb) => rb ? { ...rb, curCX: cx, curCY: cy } : null);
     }
   };
 
-  const onMouseUp = () => {
-    dragRef.current = null;
+  // ── Mouse up — commit rubber-band ──────────────────────────────────────────
+
+  const onMouseUp = (e: React.MouseEvent) => {
+    if (rubberBand) {
+      const rb = rubberBand;
+      const minX = Math.min(rb.startCX, rb.curCX);
+      const maxX = Math.max(rb.startCX, rb.curCX);
+      const minY = Math.min(rb.startCY, rb.curCY);
+      const maxY = Math.max(rb.startCY, rb.curCY);
+
+      if (maxX - minX > 4 || maxY - minY > 4) {
+        const view = activeViewRef.current;
+        if (view) {
+          const hit = view.widgets
+            .filter((w) => w.position.x < maxX && w.position.x + w.position.width > minX &&
+                           w.position.y < maxY && w.position.y + w.position.height > minY)
+            .map((w) => w.id);
+          if (hit.length > 0) {
+            const merged = e.shiftKey ? Array.from(new Set([...selectedWidgetIdsRef.current, ...hit])) : hit;
+            useEditorStore.setState({ selectedWidgetIds: merged });
+          } else if (!e.shiftKey) {
+            clearSelection();
+          }
+        }
+      }
+      setRubberBand(null);
+    }
+
+    multiDragRef.current = null;
     resizeRef.current = null;
     panDragRef.current = null;
   };
 
+  // ── Canvas background click — deselect / pan / rubber-band ────────────────
+
   const onCanvasMouseDown = (e: React.MouseEvent) => {
-    selectWidget(null);
     if (e.button === 1 || e.altKey) {
       panDragRef.current = { startX: e.clientX, startY: e.clientY, origPan: { ...pan } };
+      return;
     }
+    if (!e.shiftKey) clearSelection();
+    const { cx, cy } = clientToCanvas(e.clientX, e.clientY);
+    setRubberBand({ startCX: cx, startCY: cy, curCX: cx, curCY: cy });
   };
 
   if (!activeView) {
@@ -211,6 +318,17 @@ export default function CanvasArea() {
 
   const { sizex = 1920, sizey = 1080, style = { backgroundColor: '#1a1a2e', backgroundOpacity: 1 }, widgets = [] } = activeView;
 
+  // Rubber-band rect in screen-space for the overlay
+  const rbScreen = rubberBand ? (() => {
+    const l = Math.min(rubberBand.startCX, rubberBand.curCX) * zoom + pan.x;
+    const t = Math.min(rubberBand.startCY, rubberBand.curCY) * zoom + pan.y;
+    const w = Math.abs(rubberBand.curCX - rubberBand.startCX) * zoom;
+    const h = Math.abs(rubberBand.curCY - rubberBand.startCY) * zoom;
+    return { left: l, top: t, width: w, height: h };
+  })() : null;
+
+  const soleSelectedId = selectedWidgetIds.length === 1 ? selectedWidgetIds[0] : null;
+
   return (
     <Box
       ref={containerRef}
@@ -219,7 +337,7 @@ export default function CanvasArea() {
         overflow: 'hidden',
         bgcolor: '#0a0a18',
         position: 'relative',
-        cursor: panDragRef.current ? 'grabbing' : 'default',
+        cursor: panDragRef.current ? 'grabbing' : rubberBand ? 'crosshair' : 'default',
         userSelect: 'none',
       }}
       onMouseMove={onMouseMove}
@@ -235,7 +353,7 @@ export default function CanvasArea() {
           transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
         }}
       >
-        {/* Canvas background */}
+        {/* Canvas */}
         <div
           style={{
             position: 'relative',
@@ -248,7 +366,8 @@ export default function CanvasArea() {
           }}
         >
           {widgets.map((w) => {
-            const selected = w.id === selectedWidgetId;
+            const selected = selectedWidgetIds.includes(w.id);
+            const soleSelected = w.id === soleSelectedId;
             return (
               <div
                 key={w.id}
@@ -260,14 +379,15 @@ export default function CanvasArea() {
                   width: w.position.width,
                   height: w.position.height,
                   zIndex: selected ? 999 : (w.position.zIndex ?? 1),
-                  outline: selected ? '2px solid #6c63ff' : '1px solid transparent',
+                  outline: selected
+                    ? selectedWidgetIds.length > 1 ? '2px dashed #6c63ff' : '2px solid #6c63ff'
+                    : '1px solid transparent',
                   cursor: 'move',
                   boxSizing: 'border-box',
                 }}
               >
                 <WidgetRenderer config={w} isEditMode={true} />
 
-                {/* hiddenInEdit overlay */}
                 {w.hiddenInEdit && (
                   <div style={{
                     position: 'absolute', inset: 0,
@@ -279,21 +399,15 @@ export default function CanvasArea() {
                   </div>
                 )}
 
-                {/* Resize handles — only on selected widget */}
-                {selected && HANDLE_DEFS.map(({ handle, cursor, style: hs }) => (
+                {/* Resize handles — sole selection only */}
+                {soleSelected && HANDLE_DEFS.map(({ handle, cursor, style: hs }) => (
                   <div
                     key={handle}
                     onMouseDown={(e) => onResizeMouseDown(e, w, handle)}
                     style={{
-                      position: 'absolute',
-                      width: 8,
-                      height: 8,
-                      background: '#6c63ff',
-                      border: '1px solid #fff',
-                      borderRadius: 1,
-                      cursor,
-                      zIndex: 1000,
-                      ...hs,
+                      position: 'absolute', width: 8, height: 8,
+                      background: '#6c63ff', border: '1px solid #fff',
+                      borderRadius: 1, cursor, zIndex: 1000, ...hs,
                     }}
                   />
                 ))}
@@ -303,21 +417,38 @@ export default function CanvasArea() {
         </div>
       </div>
 
-      {/* Zoom indicator */}
-      <Box
-        sx={{
+      {/* Rubber-band rect */}
+      {rbScreen && (
+        <div style={{
           position: 'absolute',
-          bottom: 12,
-          right: 12,
-          bgcolor: 'rgba(0,0,0,0.5)',
-          color: 'text.secondary',
-          px: 1,
-          py: 0.5,
-          borderRadius: 1,
-          fontSize: 11,
-          fontFamily: 'monospace',
-        }}
-      >
+          left: rbScreen.left, top: rbScreen.top,
+          width: rbScreen.width, height: rbScreen.height,
+          border: '1px solid #6c63ff',
+          background: 'rgba(108,99,255,0.1)',
+          pointerEvents: 'none',
+          zIndex: 2000,
+          boxSizing: 'border-box',
+        }} />
+      )}
+
+      {/* Multi-select badge */}
+      {selectedWidgetIds.length > 1 && (
+        <Box sx={{
+          position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+          bgcolor: 'rgba(108,99,255,0.85)', color: '#fff',
+          px: 1.5, py: 0.5, borderRadius: 1, fontSize: 12,
+          fontFamily: 'monospace', pointerEvents: 'none', zIndex: 2000,
+        }}>
+          {selectedWidgetIds.length} widgets selected · Ctrl+C/D · Delete
+        </Box>
+      )}
+
+      {/* Zoom indicator */}
+      <Box sx={{
+        position: 'absolute', bottom: 12, right: 12,
+        bgcolor: 'rgba(0,0,0,0.5)', color: 'text.secondary',
+        px: 1, py: 0.5, borderRadius: 1, fontSize: 11, fontFamily: 'monospace',
+      }}>
         {Math.round(zoom * 100)}% | {sizex}×{sizey}
       </Box>
     </Box>

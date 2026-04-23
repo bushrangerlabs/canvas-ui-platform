@@ -283,6 +283,27 @@ const WeatherWidgetMetadata: WidgetMetadata = {
   ],
 };
 
+const CalendarWidgetMetadata: WidgetMetadata = {
+  name: 'Calendar',
+  icon: 'CalendarMonth',
+  category: 'display',
+  description: 'Monthly calendar with today highlight and month navigation',
+  defaultSize: { w: 320, h: 300 },
+  minSize: { w: 200, h: 220 },
+  requiresEntity: false,
+  fields: [
+    { name: 'width',       type: 'number',   label: 'Width',           default: 320, min: 200, category: 'layout' },
+    { name: 'height',      type: 'number',   label: 'Height',          default: 300, min: 220, category: 'layout' },
+    { name: 'accentColor', type: 'color',    label: 'Accent Color',    default: '#6c63ff', category: 'style' },
+    { name: 'textColor',   type: 'color',    label: 'Text Color',      default: '#e0e0e0', category: 'style' },
+    { name: 'bgColor',     type: 'color',    label: 'Background',      default: 'transparent', category: 'style' },
+    { name: 'fontSize',    type: 'number',   label: 'Font Size',       default: 12, min: 8, max: 24, category: 'style' },
+    { name: 'firstDay',    type: 'select',   label: 'First Day',       default: '0', category: 'behavior',
+      options: [{ value: '0', label: 'Sunday' }, { value: '1', label: 'Monday' }] },
+    { name: 'showNav',     type: 'checkbox', label: 'Show nav arrows', default: true, category: 'behavior' },
+  ],
+};
+
 const GraphWidgetMetadata: WidgetMetadata = {
   name: 'Graph',
   icon: 'ShowChart',
@@ -875,6 +896,7 @@ export const WIDGET_CATALOG: Record<string, WidgetMetadata> = {
   html: HtmlWidgetMetadata,
   scrollingtext: ScrollingTextWidgetMetadata,
   weather: WeatherWidgetMetadata,
+  calendar: CalendarWidgetMetadata,
   graph: GraphWidgetMetadata,
   resolution: ResolutionWidgetMetadata,
   // Clocks

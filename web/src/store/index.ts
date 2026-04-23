@@ -18,7 +18,8 @@ interface EditorState {
   isDirty: boolean;
 
   // ── selection state ──────────────────────────────────────────────────────
-  selectedWidgetId: string | null;
+  selectedWidgetIds: string[];
+  clipboard: WidgetConfig[];
 
   // ── undo / redo ───────────────────────────────────────────────────────────
   _past: ViewConfig[];
@@ -51,6 +52,14 @@ interface EditorState {
   duplicateWidget: (id: string) => void;
   selectWidget: (id: string | null) => void;
   setSelectedWidgetId: (id: string | null) => void;
+  toggleWidgetSelection: (id: string) => void;
+  selectAllWidgets: () => void;
+  clearSelection: () => void;
+  copySelected: () => void;
+  pasteClipboard: () => void;
+  deleteSelected: () => void;
+  duplicateSelected: () => void;
+  moveSelected: (dx: number, dy: number) => void;
 
   // z-order
   bringToFront: (id: string) => void;
@@ -77,7 +86,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   activeViewId: null,
   activeView: null,
   isDirty: false,
-  selectedWidgetId: null,
+  selectedWidgetIds: [],
+  clipboard: [],
   _past: [],
   _future: [],
 
@@ -134,7 +144,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         activeViewId: id,
         activeView: structuredClone(existing.view_data),
         isDirty: false,
-        selectedWidgetId: null,
+        selectedWidgetIds: [],
         _past: [],
         _future: [],
       });
@@ -145,7 +155,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeViewId: id,
       activeView: structuredClone(sv.view_data),
       isDirty: false,
-      selectedWidgetId: null,
+      selectedWidgetIds: [],
       _past: [],
       _future: [],
     });
@@ -159,7 +169,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeViewId: sv.id,
       activeView: structuredClone(sv.view_data),
       isDirty: false,
-      selectedWidgetId: null,
+      selectedWidgetIds: [],
     }));
     return sv.id;
   },
@@ -238,7 +248,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           widgets: [...s.activeView.widgets, w],
         },
         isDirty: true,
-        selectedWidgetId: id,
+        selectedWidgetIds: [id],
       };
     });
     return id;
@@ -270,7 +280,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           widgets: s.activeView.widgets.filter((w) => w.id !== id),
         },
         isDirty: true,
-        selectedWidgetId: s.selectedWidgetId === id ? null : s.selectedWidgetId,
+        selectedWidgetIds: s.selectedWidgetIds.filter((wid) => wid !== id),
       };
     });
   },
@@ -297,13 +307,126 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           widgets: [...s.activeView.widgets, copy],
         },
         isDirty: true,
-        selectedWidgetId: copy.id,
+        selectedWidgetIds: [copy.id],
       };
     });
   },
 
-  selectWidget: (id) => set({ selectedWidgetId: id }),
-  setSelectedWidgetId: (id) => set({ selectedWidgetId: id }),
+  selectWidget: (id) => set({ selectedWidgetIds: id ? [id] : [] }),
+  setSelectedWidgetId: (id) => set({ selectedWidgetIds: id ? [id] : [] }),
+
+  toggleWidgetSelection: (id) => {
+    set((s) => {
+      const already = s.selectedWidgetIds.includes(id);
+      return {
+        selectedWidgetIds: already
+          ? s.selectedWidgetIds.filter((wid) => wid !== id)
+          : [...s.selectedWidgetIds, id],
+      };
+    });
+  },
+
+  selectAllWidgets: () => {
+    set((s) => ({
+      selectedWidgetIds: s.activeView ? s.activeView.widgets.map((w) => w.id) : [],
+    }));
+  },
+
+  clearSelection: () => set({ selectedWidgetIds: [] }),
+
+  copySelected: () => {
+    set((s) => {
+      if (!s.activeView || !s.selectedWidgetIds.length) return s;
+      const copied = s.activeView.widgets
+        .filter((w) => s.selectedWidgetIds.includes(w.id))
+        .map((w) => structuredClone(w));
+      return { clipboard: copied };
+    });
+  },
+
+  pasteClipboard: () => {
+    set((s) => {
+      if (!s.activeView || !s.clipboard.length) return s;
+      const newWidgets: WidgetConfig[] = s.clipboard.map((w) => ({
+        ...structuredClone(w),
+        id: nanoid(),
+        position: { ...w.position, x: w.position.x + 20, y: w.position.y + 20 },
+      }));
+      return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView!)],
+        _future: [],
+        activeView: {
+          ...s.activeView,
+          widgets: [...s.activeView.widgets, ...newWidgets],
+        },
+        selectedWidgetIds: newWidgets.map((w) => w.id),
+        // Update clipboard positions so repeated paste offsets further
+        clipboard: s.clipboard.map((w) => ({
+          ...w,
+          position: { ...w.position, x: w.position.x + 20, y: w.position.y + 20 },
+        })),
+        isDirty: true,
+      };
+    });
+  },
+
+  deleteSelected: () => {
+    set((s) => {
+      if (!s.activeView || !s.selectedWidgetIds.length) return s;
+      return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView!)],
+        _future: [],
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.filter((w) => !s.selectedWidgetIds.includes(w.id)),
+        },
+        selectedWidgetIds: [],
+        isDirty: true,
+      };
+    });
+  },
+
+  duplicateSelected: () => {
+    set((s) => {
+      if (!s.activeView || !s.selectedWidgetIds.length) return s;
+      const newWidgets: WidgetConfig[] = s.activeView.widgets
+        .filter((w) => s.selectedWidgetIds.includes(w.id))
+        .map((w) => ({
+          ...structuredClone(w),
+          id: nanoid(),
+          position: { ...w.position, x: w.position.x + 20, y: w.position.y + 20 },
+        }));
+      return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView!)],
+        _future: [],
+        activeView: {
+          ...s.activeView,
+          widgets: [...s.activeView.widgets, ...newWidgets],
+        },
+        selectedWidgetIds: newWidgets.map((w) => w.id),
+        isDirty: true,
+      };
+    });
+  },
+
+  moveSelected: (dx, dy) => {
+    set((s) => {
+      if (!s.activeView || !s.selectedWidgetIds.length) return s;
+      return {
+        _past: [...s._past.slice(-49), structuredClone(s.activeView!)],
+        _future: [],
+        activeView: {
+          ...s.activeView,
+          widgets: s.activeView.widgets.map((w) =>
+            s.selectedWidgetIds.includes(w.id)
+              ? { ...w, position: { ...w.position, x: w.position.x + dx, y: w.position.y + dy } }
+              : w,
+          ),
+        },
+        isDirty: true,
+      };
+    });
+  },
 
   bringToFront: (id) => {
     set((s) => {

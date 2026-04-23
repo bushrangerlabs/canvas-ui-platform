@@ -6,6 +6,7 @@ import GridOnIcon from '@mui/icons-material/GridOn';
 import GridOffIcon from '@mui/icons-material/GridOff';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import MonitorIcon from '@mui/icons-material/Monitor';
+import SettingsIcon from '@mui/icons-material/Settings';
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import { useEffect } from 'react';
@@ -78,6 +79,12 @@ export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
         <Tooltip title="Manage devices">
           <IconButton size="small" onClick={() => navigate('/devices')}>
             <MonitorIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title="Settings">
+          <IconButton size="small" onClick={() => navigate('/settings')}>
+            <SettingsIcon fontSize="small" />
           </IconButton>
         </Tooltip>
 
