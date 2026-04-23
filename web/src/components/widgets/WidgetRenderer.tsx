@@ -64,6 +64,7 @@ const widgetMap: Record<string, React.LazyExoticComponent<React.FC<WidgetProps>>
   scrollablecontainer: lazy(() => import('./ScrollableContainerWidget')),
   keyboard: lazy(() => import('./KeyboardWidget')),
   screensaver: lazy(() => import('./ScreensaverWidget')),
+  lovelacecard: lazy(() => import('./LovelaceCardWidget')),
 };
 
 export default function WidgetRenderer(props: WidgetProps) {

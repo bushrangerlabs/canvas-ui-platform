@@ -29,6 +29,7 @@ import { WIDGET_REGISTRY } from '../widgets/registry';
 import type { FieldMetadata } from '../widgets/metadata';
 import { EntityPickerField } from './EntityPickerField';
 import { IconPickerField } from './IconPickerField';
+import { VisibilityConditionEditor } from './VisibilityConditionEditor';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -372,24 +373,12 @@ function WidgetTab() {
           <Typography variant="caption" sx={{ fontWeight: 600, letterSpacing: 0.5 }}>VISIBILITY</Typography>
         </AccordionSummary>
         <AccordionDetails sx={{ pt: 0, pb: 1.5, px: 1.5 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-            <TextField
-              size="small" fullWidth
-              label="Show when (condition)"
-              placeholder="e.g. entity.state == 'on'"
-              value={widget.config.visibilityCondition ?? ''}
-              onChange={(e) => setConfig('visibilityCondition', e.target.value || undefined)}
-              helperText="Leave blank to always show"
-            />
-            <FormControlLabel
-              control={
-                <Checkbox size="small"
-                  checked={Boolean(widget.hiddenInEdit)}
-                  onChange={(e) => updateWidget(widget.id, { hiddenInEdit: e.target.checked })} />
-              }
-              label={<Typography variant="caption">Hide in edit mode</Typography>}
-            />
-          </Box>
+          <VisibilityConditionEditor
+            value={widget.visibility}
+            onChange={(v) => updateWidget(widget.id, { visibility: v })}
+            hiddenInEdit={Boolean(widget.hiddenInEdit)}
+            onHiddenInEditChange={(v) => updateWidget(widget.id, { hiddenInEdit: v })}
+          />
         </AccordionDetails>
       </Accordion>
     </>

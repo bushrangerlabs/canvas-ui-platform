@@ -1004,3 +1004,35 @@ const ScreensaverWidgetMetadata: WidgetMetadata = {
 (WIDGET_CATALOG as Record<string, WidgetMetadata>)['scrollablecontainer'] = ScrollableContainerWidgetMetadata;
 (WIDGET_CATALOG as Record<string, WidgetMetadata>)['keyboard'] = KeyboardWidgetMetadata;
 (WIDGET_CATALOG as Record<string, WidgetMetadata>)['screensaver'] = ScreensaverWidgetMetadata;
+
+const LovelaceCardWidgetMetadata: WidgetMetadata = {
+  name: 'Lovelace Card',
+  icon: 'DashboardOutlined',
+  category: 'display',
+  description: 'Embed any Home Assistant Lovelace card. Only functional when loaded inside the HA frontend context.',
+  defaultSize: { w: 400, h: 300 },
+  fields: [
+    { name: 'width',         type: 'number',   label: 'Width',            default: 400,        category: 'layout' },
+    { name: 'height',        type: 'number',   label: 'Height',           default: 300,        category: 'layout' },
+    { name: 'cardType',      type: 'select',   label: 'Card Type',        default: 'entities', category: 'behavior',
+      options: [
+        { label: 'Entities',       value: 'entities' },
+        { label: 'Tile',           value: 'tile' },
+        { label: 'Button',         value: 'button' },
+        { label: 'Gauge',          value: 'gauge' },
+        { label: 'Glance',         value: 'glance' },
+        { label: 'Thermostat',     value: 'thermostat' },
+        { label: 'History Graph',  value: 'history-graph' },
+        { label: 'Light',          value: 'light' },
+        { label: 'Media Control',  value: 'media-control' },
+        { label: 'Map',            value: 'map' },
+        { label: 'Markdown',       value: 'markdown' },
+        { label: 'Custom…',        value: 'custom:' },
+      ],
+    },
+    { name: 'cardConfig',      type: 'textarea', label: 'Card Config (YAML/JSON)', default: '',   category: 'behavior' },
+    { name: 'refreshInterval', type: 'number',   label: 'Auto-refresh (ms, 0=off)', default: 0,  category: 'behavior',
+      min: 0, step: 1000 },
+  ],
+};
+(WIDGET_CATALOG as Record<string, WidgetMetadata>)['lovelacecard'] = LovelaceCardWidgetMetadata;
