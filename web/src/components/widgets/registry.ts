@@ -28,6 +28,7 @@ import { RadioButtonWidgetMetadata } from './RadioButtonWidget';
 import { ColorPickerWidgetMetadata } from './ColorPickerWidget';
 import { WeatherWidgetMetadata } from './WeatherWidget';
 import { GraphWidgetMetadata } from './GraphWidget';
+import { CameraWidgetMetadata } from './CameraWidget';
 
 export const WIDGET_REGISTRY: Record<string, WidgetMetadata> = {
   // Display
@@ -60,6 +61,8 @@ export const WIDGET_REGISTRY: Record<string, WidgetMetadata> = {
   // Data
   weather: WeatherWidgetMetadata,
   graph: GraphWidgetMetadata,
+  // Media
+  camera: CameraWidgetMetadata,
 };
 
 export function getWidgetTypes(): string[] {

@@ -54,6 +54,28 @@ export async function haRoutes(app: FastifyInstance) {
     }
   });
 
+  // GET /api/ha/camera_proxy/:entityId — proxy a camera snapshot from HA
+  app.get<{ Params: { entityId: string } }>('/ha/camera_proxy/:entityId', async (req, reply) => {
+    if (!SUPERVISOR_TOKEN) {
+      reply.code(503).send({ error: 'SUPERVISOR_TOKEN not available' });
+      return;
+    }
+    try {
+      const res = await fetch(`${HA_API}/camera_proxy/${req.params.entityId}`, {
+        headers: { Authorization: `Bearer ${SUPERVISOR_TOKEN}` },
+      });
+      if (!res.ok) {
+        reply.code(res.status).send({ error: `HA camera_proxy → ${res.status}` });
+        return;
+      }
+      reply.header('Content-Type', res.headers.get('content-type') ?? 'image/jpeg');
+      reply.header('Cache-Control', 'no-cache, no-store');
+      reply.send(Buffer.from(await res.arrayBuffer()));
+    } catch (err: any) {
+      reply.code(503).send({ error: err.message });
+    }
+  });
+
   // POST /api/ha/services/:domain/:service — call an HA service
   app.post<{ Params: { domain: string; service: string } }>(
     '/ha/services/:domain/:service',

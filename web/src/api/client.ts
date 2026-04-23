@@ -5,7 +5,7 @@
 
 // When served through HA ingress the URL is /api/hassio_ingress/<token>/...
 // API calls must be prefixed with that base so they route through ingress.
-function getApiBase(): string {
+export function getApiBase(): string {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
   const match = window.location.pathname.match(/^(\/api\/hassio_ingress\/[^/]+)/);
   return match ? match[1] : '';

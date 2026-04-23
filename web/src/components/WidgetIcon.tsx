@@ -28,6 +28,7 @@ import TextRotationNoneIcon from '@mui/icons-material/TextRotationNone';
 import ToggleOnOutlinedIcon from '@mui/icons-material/ToggleOnOutlined';
 import TouchAppIcon from '@mui/icons-material/TouchApp';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import VideocamIcon from '@mui/icons-material/Videocam';
 import WbSunnyIcon from '@mui/icons-material/WbSunny';
 import WebIcon from '@mui/icons-material/Web';
 import WidgetsIcon from '@mui/icons-material/Widgets';
@@ -60,6 +61,7 @@ const ICON_MAP: Record<string, React.ComponentType<SvgIconProps>> = {
   ToggleOnOutlined: ToggleOnOutlinedIcon,
   TouchApp: TouchAppIcon,
   TuneOutlined: TuneOutlinedIcon,
+  Videocam: VideocamIcon,
   WbSunny: WbSunnyIcon,
   Web: WebIcon,
 };
