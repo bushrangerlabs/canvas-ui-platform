@@ -38,8 +38,8 @@ export function useServerSocket({ serverUrl, deviceId, enabled, onCommand }: Opt
       ws.onopen = () => {
         console.log('[ServerSocket] Connected');
         retryDelay.current = 1000; // reset backoff
-        // Announce ourselves
-        ws.send(JSON.stringify({ type: 'hello', deviceId, platform: 'linux' }));
+        // Announce ourselves — field names must match the server's hello handler
+        ws.send(JSON.stringify({ type: 'hello', client_type: 'browser', device_id: deviceId }));
       };
 
       ws.onmessage = (e) => {

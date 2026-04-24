@@ -21,7 +21,8 @@
     "@emotion/styled": "^11",
     "react": "^19",
     "react-dom": "^19",
-    "qr-scanner": "^1.4"
+    "qr-scanner": "^1.4",
+    "nanoid": "^5"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
