@@ -99,10 +99,11 @@ function parseCardConfig(text: string): Record<string, any> | null {
   } catch { return null; }
 }
 
-const LovelaceCardWidget: React.FC<WidgetProps> = ({ config }) => {
+const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const cardRef = useRef<HTMLElement | null>(null);
   const portalRef = useRef<HTMLElement | null>(null);
+  const rafRef = useRef<number>(0);
   const [error, setError] = useState<string>('');
   const [status, setStatus] = useState<'loading' | 'ok' | 'error'>('loading');
 
@@ -149,12 +150,15 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config }) => {
         if (cancelled) return;
 
         // Create card element via loadCardHelpers (preferred — works for all built-in cards)
+        // createCardElement internally calls setConfig, so we must NOT call it again.
         let cardEl: HTMLElement | null = null;
+        let configAlreadySet = false;
 
         if ((haWin as any).loadCardHelpers) {
           try {
             const helpers = await (haWin as any).loadCardHelpers();
             cardEl = await helpers.createCardElement(fullConfig);
+            configAlreadySet = true;
           } catch { /* fall through */ }
         }
 
@@ -173,8 +177,8 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config }) => {
 
         if (cancelled) return;
 
-        // Set config then hass
-        if ((cardEl as any).setConfig) {
+        // Only call setConfig on the fallback path — createCardElement already called it
+        if (!configAlreadySet && (cardEl as any).setConfig) {
           (cardEl as any).setConfig(fullConfig);
         }
         (cardEl as any).hass = hassObj;
@@ -188,7 +192,9 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config }) => {
           // Portal approach: append into haWin.document.body to avoid cross-document
           // Lit stylesheet sharing errors. Position over our React placeholder.
           const portalDiv = (haWin as any).document.createElement('div');
-          portalDiv.style.cssText = 'position:fixed;overflow:hidden;z-index:2147483647;pointer-events:auto;';
+          // In edit mode, use pointer-events:none so canvas editor can select/drag the widget.
+          // In view mode, use pointer-events:auto so the card is interactive.
+          portalDiv.style.cssText = `position:fixed;overflow:hidden;z-index:2147483647;pointer-events:${isEditMode ? 'none' : 'auto'};`;
           (haWin as any).document.body.appendChild(portalDiv);
           portalDiv.appendChild(cardEl);
           portalRef.current = portalDiv;
@@ -217,21 +223,17 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config }) => {
             portalDiv.style.height = rect.height + 'px';
           };
 
+          // Use a rAF loop for continuous position sync — this correctly tracks
+          // canvas pan/zoom (CSS transforms) and drag operations in the editor.
+          const rafLoop = () => {
+            syncPosition();
+            rafRef.current = requestAnimationFrame(rafLoop);
+          };
           syncPosition();
-          const ro = new ResizeObserver(syncPosition);
-          ro.observe(containerRef.current);
-          (haWin as any).addEventListener('scroll', syncPosition, { passive: true, capture: true });
-          (haWin as any).addEventListener('resize', syncPosition, { passive: true });
-          // Also sync on our own window scroll/resize (canvas panning)
-          window.addEventListener('scroll', syncPosition, { passive: true, capture: true });
-          window.addEventListener('resize', syncPosition, { passive: true });
+          rafRef.current = requestAnimationFrame(rafLoop);
 
           cleanup = () => {
-            ro.disconnect();
-            try { (haWin as any).removeEventListener('scroll', syncPosition, { capture: true }); } catch { /* ignore */ }
-            try { (haWin as any).removeEventListener('resize', syncPosition); } catch { /* ignore */ }
-            try { window.removeEventListener('scroll', syncPosition, { capture: true }); } catch { /* ignore */ }
-            try { window.removeEventListener('resize', syncPosition); } catch { /* ignore */ }
+            cancelAnimationFrame(rafRef.current);
           };
         } else {
           // Same document: safe to append directly
@@ -283,6 +285,13 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config }) => {
     const iv = setInterval(tick, 2000);
     return () => clearInterval(iv);
   }, []);
+
+  // Keep portal pointer-events in sync with edit mode changes
+  useEffect(() => {
+    if (portalRef.current) {
+      (portalRef.current as HTMLElement).style.pointerEvents = isEditMode ? 'none' : 'auto';
+    }
+  }, [isEditMode]);
 
   return (
     <div style={{ width: '100%', height: '100%', overflow: 'hidden', position: 'relative' }}>
