@@ -81,14 +81,28 @@ function parseCardConfig(text: string): Record<string, any> | null {
   try { return JSON.parse(trimmed); } catch { /* not JSON */ }
   try {
     const result: Record<string, any> = {};
+    let pendingKey: string | null = null;
     for (const line of trimmed.split('\n')) {
       const clean = line.trimEnd();
       if (!clean || clean.startsWith('#')) continue;
       const colon = clean.indexOf(':');
-      if (colon === -1) continue;
+      if (colon === -1) {
+        // Bare value on next line after a "key:" with no inline value
+        if (pendingKey !== null) {
+          const val = clean.trim().replace(/^['"]|['"]$/g, '');
+          if (val !== '') result[pendingKey] = val;
+          pendingKey = null;
+        }
+        continue;
+      }
       const key = clean.slice(0, colon).trim();
       const val = clean.slice(colon + 1).trim();
-      if (val === '') continue;
+      pendingKey = null;
+      if (val === '') {
+        // Value may be on the next line (e.g. "entity:\n  climate.foo")
+        pendingKey = key;
+        continue;
+      }
       if (val === 'true')  { result[key] = true;  continue; }
       if (val === 'false') { result[key] = false; continue; }
       const num = Number(val);
