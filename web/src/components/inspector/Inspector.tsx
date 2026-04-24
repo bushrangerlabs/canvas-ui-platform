@@ -27,6 +27,7 @@ import DistributeVerticalIcon from '@mui/icons-material/TableRows';
 import { useEditorStore } from '../../store';
 import { WIDGET_REGISTRY } from '../widgets/registry';
 import type { FieldMetadata } from '../widgets/metadata';
+import { HexColorPicker } from 'react-colorful';
 import { EntityPickerField } from './EntityPickerField';
 import { IconPickerField } from './IconPickerField';
 import { VisibilityConditionEditor } from './VisibilityConditionEditor';
@@ -385,6 +386,105 @@ function WidgetTab() {
   );
 }
 
+// ── Color field component ────────────────────────────────────────────────────
+
+function ColorFieldInspector({
+  field,
+  value,
+  onChange,
+}: {
+  field: FieldMetadata;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [showPicker, setShowPicker] = useState(false);
+
+  const isBinding = /^\{.*\}$/.test(value);
+
+  const isValidColor = (c: string) =>
+    /^#([0-9a-f]{3,8})$/i.test(c) ||
+    /^(rgb|hsl)a?\(/.test(c) ||
+    /^[a-z]+$/i.test(c);
+
+  const swatchColor = !isBinding && isValidColor(value) ? value : null;
+
+  return (
+    <Box key={field.name}>
+      <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
+        <TextField
+          label={field.label}
+          size="small"
+          fullWidth
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#rrggbb or {entity.id}"
+          slotProps={{ htmlInput: { style: { fontFamily: 'monospace', fontSize: 13 } } }}
+        />
+        <Tooltip title={isBinding ? 'Binding active — clear to use picker' : 'Open color picker'}>
+          <span>
+            <IconButton
+              size="small"
+              onClick={() => setShowPicker((p) => !p)}
+              disabled={isBinding}
+              sx={{
+                width: 32,
+                height: 32,
+                border: '1px solid',
+                borderColor: showPicker ? 'primary.main' : 'divider',
+                borderRadius: 1,
+                p: 0,
+                flexShrink: 0,
+                overflow: 'hidden',
+                bgcolor: swatchColor ?? 'transparent',
+                ...(!swatchColor && {
+                  backgroundImage:
+                    'repeating-linear-gradient(45deg, #555 0px, #555 4px, #333 4px, #333 8px)',
+                }),
+                '&:hover': { opacity: 0.85 },
+                '&.Mui-disabled': { opacity: 0.5, cursor: 'not-allowed' },
+              }}
+            />
+          </span>
+        </Tooltip>
+        {isBinding && (
+          <Tooltip title="Binding expression — will resolve at runtime">
+            <Box
+              sx={{
+                width: 32,
+                height: 32,
+                flexShrink: 0,
+                border: '2px solid',
+                borderColor: 'primary.main',
+                borderRadius: 1,
+                backgroundImage:
+                  'repeating-linear-gradient(45deg, #555 0px, #555 4px, #333 4px, #333 8px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                userSelect: 'none',
+              }}
+            >
+              🔗
+            </Box>
+          </Tooltip>
+        )}
+      </Box>
+      {showPicker && !isBinding && (
+        <Box sx={{ mt: 1, p: 2, bgcolor: 'background.paper', borderRadius: 1, boxShadow: 3 }}>
+          <HexColorPicker
+            color={swatchColor?.startsWith('#') ? swatchColor : '#000000'}
+            onChange={onChange}
+          />
+          <Button fullWidth size="small" onClick={() => setShowPicker(false)} sx={{ mt: 1 }}>
+            Close
+          </Button>
+        </Box>
+      )}
+    </Box>
+  );
+}
+
 // ── Field renderer ────────────────────────────────────────────────────────────
 
 function renderField(
@@ -458,19 +558,12 @@ function renderField(
 
     case 'color':
       return (
-        <Box key={field.name} sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-          <input
-            type="color"
-            value={value || '#ffffff'}
-            onChange={(e) => setConfig(field.name, e.target.value)}
-            style={{ width: 32, height: 32, padding: 0, border: 'none', cursor: 'pointer', borderRadius: 4 }}
-          />
-          <TextField
-            size="small" label={field.label} value={value}
-            onChange={(e) => setConfig(field.name, e.target.value)}
-            sx={{ flex: 1 }}
-          />
-        </Box>
+        <ColorFieldInspector
+          key={field.name}
+          field={field}
+          value={String(value)}
+          onChange={(v) => setConfig(field.name, v)}
+        />
       );
 
     case 'textarea':
