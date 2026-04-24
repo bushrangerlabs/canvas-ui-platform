@@ -10,7 +10,9 @@ export default function App() {
   const [config, setConfig] = useState<AppConfig | null | 'loading'>('loading');
 
   useEffect(() => {
-    loadConfig().then(setConfig);
+    loadConfig()
+      .then(setConfig)
+      .catch(() => setConfig(null)); // store error → show settings
   }, []);
 
   if (config === 'loading') {

@@ -67,7 +67,8 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         setDeviceId(device.id);
         setAppState('ready');
       } catch (e) {
-        setErrorMsg(String(e));
+        const url = `${config.serverUrl}/api/devices/register`;
+        setErrorMsg(`Cannot reach server at ${url}\n\n${String(e)}\n\nCheck that canvas-ui-platform server is running and the URL is correct.`);
         setAppState('error');
       }
     }
