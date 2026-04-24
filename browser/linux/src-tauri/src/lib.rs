@@ -1,4 +1,4 @@
-use tauri::{AppHandle, Manager};
+use tauri::AppHandle;
 use tauri_plugin_shell::ShellExt;
 
 /// Turn the display off using xset (Linux only)

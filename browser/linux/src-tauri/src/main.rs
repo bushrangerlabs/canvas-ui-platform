@@ -2,8 +2,6 @@
 // but keeping for cross-platform consistency.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod lib;
-
 fn main() {
-    lib::run();
+    canvas_ui_browser_linux_lib::run();
 }
