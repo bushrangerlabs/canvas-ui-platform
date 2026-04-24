@@ -46,7 +46,6 @@ async function main() {
     root: webRoot,
     prefix: '/',
     index: 'index.html',
-    decorateReply: false,
   });
 
   // Never cache index.html — ensures fresh asset hashes after updates
