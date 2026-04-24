@@ -123,6 +123,7 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
 
   const {
     cardType = 'entities',
+    entity_id = '',
     cardConfig = '',
     refreshInterval = 0,
   } = config.config;
@@ -157,7 +158,9 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
           type: cardType.startsWith('custom:') || cardType.includes('-') || cardType.includes(':')
             ? cardType
             : cardType.replace(/^hui-/, '').replace(/-card$/, ''),
+          // Extra config textarea first, then entity_id field wins (so the picker always takes effect)
           ...parsed,
+          ...(entity_id ? { entity: entity_id } : {}),
         };
 
         const hassObj = await waitForHass();
@@ -286,7 +289,7 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
         cardRef.current = null;
       }
     };
-  }, [cardType, cardConfig, refreshInterval]);
+  }, [cardType, entity_id, cardConfig, refreshInterval]);
 
   // Keep hass up-to-date on the mounted card so entity states refresh.
   useEffect(() => {
