@@ -1,0 +1,32 @@
+import React, { useEffect, useState } from 'react';
+import { createTheme, ThemeProvider, CssBaseline } from '@mui/material';
+import { loadConfig, type AppConfig } from './store/config';
+import SettingsScreen from './screens/SettingsScreen';
+import KioskScreen from './screens/KioskScreen';
+
+const darkTheme = createTheme({ palette: { mode: 'dark' } });
+
+export default function App() {
+  const [config, setConfig] = useState<AppConfig | null | 'loading'>('loading');
+
+  useEffect(() => {
+    loadConfig().then(setConfig);
+  }, []);
+
+  if (config === 'loading') {
+    return null; // splash / black screen while reading config
+  }
+
+  return (
+    <ThemeProvider theme={darkTheme}>
+      <CssBaseline />
+      {!config ? (
+        // No config yet — show first-boot settings
+        <SettingsScreen onSaved={setConfig} />
+      ) : (
+        // Config present — show kiosk view
+        <KioskScreen config={config} onResetConfig={() => setConfig(null)} />
+      )}
+    </ThemeProvider>
+  );
+}
