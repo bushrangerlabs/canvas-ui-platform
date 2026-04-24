@@ -219,19 +219,28 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
           const syncPosition = () => {
             if (!containerRef.current || !portalDiv.isConnected) return;
             const rect = containerRef.current.getBoundingClientRect();
-            // Find our iframe in the parent window to get its viewport offset
+            // Get our iframe's offset in the parent window.
+            // window.frameElement is the most reliable way (no scanning needed).
             let iframeTop = 0, iframeLeft = 0;
             try {
-              const iframes = (haWin as any).document.querySelectorAll('iframe');
-              for (const iframe of iframes) {
-                try {
-                  if (iframe.contentWindow === window) {
-                    const ir = iframe.getBoundingClientRect();
-                    iframeTop = ir.top;
-                    iframeLeft = ir.left;
-                    break;
-                  }
-                } catch { /* cross-origin */ }
+              const frameEl = window.frameElement as HTMLElement | null;
+              if (frameEl) {
+                const ir = frameEl.getBoundingClientRect();
+                iframeTop = ir.top;
+                iframeLeft = ir.left;
+              } else {
+                // Fallback: scan iframes in parent window
+                const iframes = (haWin as any).document.querySelectorAll('iframe');
+                for (const iframe of iframes) {
+                  try {
+                    if (iframe.contentWindow === window) {
+                      const ir = iframe.getBoundingClientRect();
+                      iframeTop = ir.top;
+                      iframeLeft = ir.left;
+                      break;
+                    }
+                  } catch { /* cross-origin */ }
+                }
               }
             } catch { /* ignore */ }
             portalDiv.style.top    = (iframeTop  + rect.top)    + 'px';
