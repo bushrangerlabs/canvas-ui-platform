@@ -68,7 +68,7 @@ export default function DevicesPage() {
     setEditDevice(dev);
     setEditName(dev.name);
     setEditDescription(dev.description ?? '');
-    setEditViewId(dev.current_view_id ?? '');
+    setEditViewId(dev.default_view_id ?? '');
     setEditScheduleId(dev.schedule_id ?? '');
   };
 
@@ -176,7 +176,7 @@ export default function DevicesPage() {
                       )}
                     </TableCell>
                     <TableCell>
-                      <Typography variant="caption">{dev.metadata?.platform ?? '—'}</Typography>
+                      <Typography variant="caption">{dev.platform ?? '—'}</Typography>
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -187,7 +187,12 @@ export default function DevicesPage() {
                       />
                     </TableCell>
                     <TableCell>
-                      <Typography variant="body2">{viewName(dev.current_view_id)}</Typography>
+                      <Typography variant="body2">{viewName(dev.default_view_id)}</Typography>
+                      {dev.current_view_id && dev.current_view_id !== dev.default_view_id && (
+                        <Typography variant="caption" sx={{ color: 'text.secondary', display: 'block' }}>
+                          Live: {viewName(dev.current_view_id)}
+                        </Typography>
+                      )}
                     </TableCell>
                     <TableCell>
                       <Typography variant="caption" sx={{ color: 'text.secondary' }}>

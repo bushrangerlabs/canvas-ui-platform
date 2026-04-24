@@ -126,8 +126,14 @@ export interface Device {
   id: string;
   name: string;
   description?: string;
+  platform?: string;
+  /** The view pinned/assigned to this device — shown when no schedule is active */
+  default_view_id?: string;
+  /** The live view currently being displayed (may differ from default if schedule is running) */
   current_view_id?: string;
   schedule_id?: string;
+  ip_address?: string;
+  app_version?: string;
   connected: boolean;
   last_seen?: string;
   metadata?: Record<string, any>;
