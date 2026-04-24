@@ -132,7 +132,7 @@ export default function DisplayPage() {
         width: '100vw',
         height: '100vh',
         overflow: 'hidden',
-        bgcolor: view?.style.backgroundColor ?? '#000',
+        bgcolor: view?.style?.backgroundColor ?? '#000',
         position: 'relative',
       }}
     >
