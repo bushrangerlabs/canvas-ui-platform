@@ -58,6 +58,15 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
       setLoading(true);
       const { type, name } = parseIconString(icon);
 
+      // Fast path: outlineMode='none' for non-legacy icons — use @iconify/react directly
+      // This avoids the async @mdi/react loading and the setIconComponent pattern
+      // which can fail with React error #130 in certain environments (e.g. HA ingress).
+      // Legacy react-icons (fa:, md:, io:, bi:) still use async loading.
+      if (outlineMode === 'none' && type !== 'fa' && type !== 'md' && type !== 'io' && type !== 'bi') {
+        if (mounted) setLoading(false);
+        return;
+      }
+
       try {
         // Check for iconify collections FIRST (before emoji check)
         // This handles fa6-solid:, material-symbols:, bi:, ion:, etc.
@@ -465,7 +474,17 @@ export const DynamicIcon: React.FC<DynamicIconProps> = ({
     };
   }, [icon, size, color, outlineMode, strokeWidth, glowWidth, glowColor, shadowEnabled, shadowColor, shadowOffsetX, shadowOffsetY, shadowBlur, fillDirection, fillColor, fillImage, coverColor, fillPercentage]);
 
-  if (loading || !IconComponent) {
+  // Fast path: outlineMode='none' for non-legacy icons uses @iconify/react directly,
+  // bypassing the async setIconComponent pattern.
+  const { type: iconType } = parseIconString(icon);
+  if (outlineMode === 'none' && iconType !== 'fa' && iconType !== 'md' && iconType !== 'io' && iconType !== 'bi') {
+    return <UniversalIcon icon={icon} size={size} color={color} style={style} />;
+  }
+
+  // typeof guard: if anything caused IconComponent to be set to a non-function
+  // (e.g. React version skew, stale closure), fall back to the loading indicator
+  // rather than crashing with React error #130.
+  if (loading || typeof IconComponent !== 'function') {
     return <span style={{ fontSize: size, ...style }}>⏳</span>;
   }
 
