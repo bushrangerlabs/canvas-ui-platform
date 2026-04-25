@@ -3,6 +3,9 @@
   "identifier": "remote",
   "local": false,
   "windows": ["panel-*", "floating"],
+  "remote": {
+    "urls": ["http://*/*", "https://*/*"]
+  },
   "permissions": [
     "core:default",
     "notification:default",
