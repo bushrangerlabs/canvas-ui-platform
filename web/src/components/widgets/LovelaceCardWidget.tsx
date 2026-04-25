@@ -63,12 +63,14 @@ function getFullHass(): any {
   return (window as any).hass;
 }
 
-function waitForHass(): Promise<any> {
-  return new Promise((resolve) => {
+function waitForHass(timeoutMs = 6000): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const deadline = Date.now() + timeoutMs;
     const check = () => {
       const h = getFullHass();
-      if (h && h.states && Object.keys(h.states).length > 0) resolve(h);
-      else setTimeout(check, 150);
+      if (h && h.states && Object.keys(h.states).length > 0) { resolve(h); return; }
+      if (Date.now() >= deadline) { reject(new Error('Home Assistant frontend not available. Lovelace cards only work when displayed via the HA Canvas UI panel (ingress), not standalone.')); return; }
+      setTimeout(check, 150);
     };
     check();
   });
