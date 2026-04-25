@@ -172,9 +172,19 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
   });
 
   // ── Panel URL resolver ─────────────────────────────────────────────────────
+  // External URLs (not on the platform server) are routed through /proxy so
+  // that X-Frame-Options / CSP frame-ancestors headers are stripped before the
+  // WebView sees them.
+  function maybeProxy(url: string): string {
+    if (!url) return url;
+    // Relative URLs or URLs already pointing at the platform server don't need proxying
+    if (url.startsWith('/') || url.startsWith(config.serverUrl)) return url;
+    return `${config.serverUrl}/proxy?url=${encodeURIComponent(url)}`;
+  }
+
   function panelSrc(panel: PagePanel): string {
-    if (panelUrlOverrides[panel.id]) return panelUrlOverrides[panel.id];
-    if (panel.url) return panel.url;
+    if (panelUrlOverrides[panel.id]) return maybeProxy(panelUrlOverrides[panel.id]);
+    if (panel.url) return maybeProxy(panel.url);
     if (panel.view_id) return `${config.serverUrl}/display?view=${encodeURIComponent(panel.view_id)}`;
     return `${config.serverUrl}/display?device=${encodeURIComponent(deviceId)}`;
   }
@@ -268,7 +278,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       {/* Floating overlay panel */}
       {floatingUrl && (
         <iframe
-          src={floatingUrl}
+          src={maybeProxy(floatingUrl)}
           style={floatingStyle}
           allow="autoplay; fullscreen"
           title="Floating Panel"
