@@ -19,6 +19,8 @@ export interface AppConfig {
   swipeNavEnabled: boolean;
   /** Platform identifier */
   platform: 'linux';
+  /** HA ingress path e.g. /api/hassio_ingress/TOKEN — fetched from server at runtime, not persisted */
+  haIngressPath?: string;
 }
 
 let _store: Store | null = null;

@@ -36,6 +36,24 @@ async function supervisorPost(path: string, body: unknown) {
 }
 
 export async function haRoutes(app: FastifyInstance) {
+  // GET /api/ingress-info — returns this add-on's ingress path from the supervisor
+  // Used by the kiosk app to load panels via HA ingress so Lovelace cards can access HA frontend
+  app.get('/ingress-info', async (_req, reply) => {
+    if (!SUPERVISOR_TOKEN) {
+      return reply.send({ ingress_url: null });
+    }
+    try {
+      const res = await fetch('http://supervisor/addons/self/info', {
+        headers: { Authorization: `Bearer ${SUPERVISOR_TOKEN}` },
+      });
+      if (!res.ok) return reply.send({ ingress_url: null });
+      const info = await res.json() as any;
+      return reply.send({ ingress_url: info?.data?.ingress_url ?? null });
+    } catch {
+      return reply.send({ ingress_url: null });
+    }
+  });
+
   // GET /api/ha/states — returns all entity states
   app.get('/ha/states', async (_req, reply) => {
     try {
