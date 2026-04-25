@@ -127,13 +127,19 @@ export interface Device {
   name: string;
   description?: string;
   platform?: string;
+  slug?: string;
   /** The view pinned/assigned to this device — shown when no schedule is active */
   default_view_id?: string;
+  /** The page assigned to this device (new pages system) */
+  default_page_id?: string;
   /** The live view currently being displayed (may differ from default if schedule is running) */
   current_view_id?: string;
   schedule_id?: string;
   ip_address?: string;
   app_version?: string;
+  screen_width?: number;
+  screen_height?: number;
+  pixel_ratio?: number;
   connected: boolean;
   last_seen?: string;
   metadata?: Record<string, any>;
@@ -156,6 +162,42 @@ export interface Schedule {
   updated_at: string;
 }
 
+// ── Pages ────────────────────────────────────────────────────────────────────
+
+export interface PagePanel {
+  id: string;
+  page_id: string;
+  name: string;
+  x: number;   // % 0-100
+  y: number;
+  w: number;
+  h: number;
+  view_id?: string;
+  url?: string;
+  position: number;
+}
+
+export interface FloatingConfig {
+  view_id?: string;
+  url?: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  visible: boolean;
+}
+
+export interface Page {
+  id: string;
+  name: string;
+  swipe_left_page_id?: string;
+  swipe_right_page_id?: string;
+  floating_config?: FloatingConfig | null;
+  panels: PagePanel[];
+  created_at: string;
+  updated_at: string;
+}
+
 // ── WebSocket messages ────────────────────────────────────────────────────────
 
 export type WsInboundMessage =
@@ -164,6 +206,7 @@ export type WsInboundMessage =
   | { type: 'data_update'; sourceId: string; key: string; value: any; unit?: string }
   | { type: 'ha_state_update'; entity_id: string; state: string; attributes: Record<string, any>; last_updated?: string; last_changed?: string }
   | { type: 'command'; id: number; device_id: string; action: string; payload: Record<string, any> }
+  | { type: 'load_page'; page_id: string; page_data: Page }
   | { type: 'pong' };
 
 export type WsOutboundMessage =

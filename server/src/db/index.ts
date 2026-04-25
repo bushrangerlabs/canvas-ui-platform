@@ -168,4 +168,42 @@ const migrations: Array<{
       `);
     },
   },
+  {
+    version: 3,
+    name: 'pages and panels system',
+    up: (db) => {
+      db.exec(`
+        CREATE TABLE pages (
+          id                  TEXT PRIMARY KEY,
+          name                TEXT NOT NULL,
+          swipe_left_page_id  TEXT,
+          swipe_right_page_id TEXT,
+          floating_config     TEXT,
+          created_at          TEXT NOT NULL DEFAULT (datetime('now')),
+          updated_at          TEXT NOT NULL DEFAULT (datetime('now'))
+        );
+
+        CREATE TABLE page_panels (
+          id        TEXT PRIMARY KEY,
+          page_id   TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+          name      TEXT NOT NULL,
+          x         REAL NOT NULL DEFAULT 0,
+          y         REAL NOT NULL DEFAULT 0,
+          w         REAL NOT NULL DEFAULT 100,
+          h         REAL NOT NULL DEFAULT 100,
+          view_id   TEXT,
+          url       TEXT,
+          position  INTEGER NOT NULL DEFAULT 0
+        );
+
+        CREATE INDEX idx_page_panels_page_id ON page_panels(page_id);
+
+        ALTER TABLE devices ADD COLUMN default_page_id TEXT;
+        ALTER TABLE devices ADD COLUMN slug TEXT;
+        ALTER TABLE devices ADD COLUMN screen_width INTEGER;
+        ALTER TABLE devices ADD COLUMN screen_height INTEGER;
+        ALTER TABLE devices ADD COLUMN pixel_ratio REAL;
+      `);
+    },
+  },
 ];

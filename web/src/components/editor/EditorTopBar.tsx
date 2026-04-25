@@ -9,6 +9,7 @@ import VisibilityIcon from '@mui/icons-material/Visibility';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import SettingsIcon from '@mui/icons-material/Settings';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import LayersIcon from '@mui/icons-material/Layers';
 import MenuIcon from '@mui/icons-material/Menu';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import { useEffect, useState } from 'react';
@@ -83,6 +84,12 @@ export default function EditorTopBar({ sidebarOpen, onToggleSidebar }: Props) {
         <Tooltip title="Manage devices">
           <IconButton size="small" onClick={() => navigate('/devices')}>
             <MonitorIcon fontSize="small" />
+          </IconButton>
+        </Tooltip>
+
+        <Tooltip title="Pages">
+          <IconButton size="small" onClick={() => navigate('/pages')}>
+            <LayersIcon fontSize="small" />
           </IconButton>
         </Tooltip>
 

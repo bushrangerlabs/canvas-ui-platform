@@ -30,13 +30,16 @@ export async function deviceRoutes(app: FastifyInstance) {
     const existing = db.prepare('SELECT id FROM devices WHERE id = ?').get(id);
     if (existing) {
       // Update last_seen + metadata
-      db.prepare(`UPDATE devices SET last_seen=?, ip_address=?, app_version=?, platform=? WHERE id=?`)
-        .run(now, body.ip_address ?? null, body.app_version ?? null, body.platform ?? 'unknown', id);
+      db.prepare(`UPDATE devices SET last_seen=?, ip_address=?, app_version=?, platform=?,
+        screen_width=COALESCE(?, screen_width), screen_height=COALESCE(?, screen_height), pixel_ratio=COALESCE(?, pixel_ratio)
+        WHERE id=?`)
+        .run(now, body.ip_address ?? null, body.app_version ?? null, body.platform ?? 'unknown',
+          body.screen_width ?? null, body.screen_height ?? null, body.pixel_ratio ?? null, id);
       return db.prepare('SELECT * FROM devices WHERE id = ?').get(id);
     }
     db.prepare(`
-      INSERT INTO devices (id, name, platform, description, default_view_id, last_seen, ip_address, app_version, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO devices (id, name, platform, description, default_view_id, last_seen, ip_address, app_version, created_at, slug, screen_width, screen_height, pixel_ratio)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       id,
       body.name ?? id,
@@ -47,6 +50,10 @@ export async function deviceRoutes(app: FastifyInstance) {
       body.ip_address ?? null,
       body.app_version ?? null,
       now,
+      body.slug ?? null,
+      body.screen_width ?? null,
+      body.screen_height ?? null,
+      body.pixel_ratio ?? null,
     );
     broadcast({ type: 'device_registered', device_id: id }, 'editor');
     reply.code(201);
@@ -61,7 +68,7 @@ export async function deviceRoutes(app: FastifyInstance) {
     if (!existing) return reply.code(404).send({ error: 'Device not found' });
     const fields: string[] = [];
     const vals: any[] = [];
-    const patchable = ['name', 'description', 'default_view_id', 'screen_on', 'brightness', 'platform', 'schedule_id'];
+    const patchable = ['name', 'description', 'default_view_id', 'default_page_id', 'slug', 'screen_on', 'brightness', 'platform', 'schedule_id'];
     for (const f of patchable) {
       if (body[f] !== undefined) { fields.push(`${f}=?`); vals.push(body[f]); }
     }
@@ -75,6 +82,16 @@ export async function deviceRoutes(app: FastifyInstance) {
         if (row) {
           const viewData = { ...row, widgets: JSON.parse(row.widgets ?? '[]'), tags: JSON.parse(row.tags ?? '[]') };
           sendCommand(req.params.id, { type: 'view_change', viewId: row.id, viewData });
+        }
+      }
+
+      // Push load_page to the device if default_page_id changed
+      if (body.default_page_id) {
+        const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(body.default_page_id) as any;
+        if (page) {
+          const panels = db.prepare('SELECT * FROM page_panels WHERE page_id=? ORDER BY position').all(body.default_page_id);
+          const pageData = { ...page, floating_config: page.floating_config ? JSON.parse(page.floating_config) : null, panels };
+          sendCommand(req.params.id, { type: 'load_page', page_id: body.default_page_id, page_data: pageData });
         }
       }
     }

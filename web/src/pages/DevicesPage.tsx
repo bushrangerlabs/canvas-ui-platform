@@ -15,14 +15,15 @@ import MonitorIcon from '@mui/icons-material/Monitor';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import { useNavigate } from 'react-router-dom';
-import { api } from '../api/client';
-import type { Device, ServerView, Schedule } from '../types';
+import { api, pagesApi } from '../api/client';
+import type { Device, ServerView, Schedule, Page } from '../types';
 
 export default function DevicesPage() {
   const navigate = useNavigate();
   const [devices, setDevices] = useState<(Device & { online?: boolean })[]>([]);
   const [views, setViews] = useState<ServerView[]>([]);
   const [schedules, setSchedules] = useState<Schedule[]>([]);
+  const [pages, setPages] = useState<Page[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +32,7 @@ export default function DevicesPage() {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editViewId, setEditViewId] = useState('');
+  const [editPageId, setEditPageId] = useState('');
   const [editScheduleId, setEditScheduleId] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -45,10 +47,14 @@ export default function DevicesPage() {
         api.get<(Device & { online?: boolean })[]>('/api/devices'),
         api.get<ServerView[]>('/api/views'),
       ]);
-      const scheds = await api.get<Schedule[]>('/api/schedules').catch(() => [] as Schedule[]);
+      const [scheds, pgs] = await Promise.all([
+        api.get<Schedule[]>('/api/schedules').catch(() => [] as Schedule[]),
+        pagesApi.list().catch(() => [] as Page[]),
+      ]);
       setDevices(devs);
       setViews(vws);
       setSchedules(scheds);
+      setPages(pgs);
     } catch (e: any) {
       setError(e.message);
     } finally {
@@ -69,6 +75,7 @@ export default function DevicesPage() {
     setEditName(dev.name);
     setEditDescription(dev.description ?? '');
     setEditViewId(dev.default_view_id ?? '');
+    setEditPageId(dev.default_page_id ?? '');
     setEditScheduleId(dev.schedule_id ?? '');
   };
 
@@ -80,6 +87,7 @@ export default function DevicesPage() {
         name: editName.trim() || editDevice.id,
         description: editDescription.trim() || undefined,
         default_view_id: editViewId || null,
+        default_page_id: editPageId || null,
         schedule_id: editScheduleId || null,
       });
       setEditDevice(null);
@@ -242,6 +250,19 @@ export default function DevicesPage() {
             value={editDescription}
             onChange={(e) => setEditDescription(e.target.value)}
           />
+          <FormControl fullWidth size="small">
+            <InputLabel>Assigned Page (new panels system)</InputLabel>
+            <Select
+              label="Assigned Page (new panels system)"
+              value={editPageId}
+              onChange={(e) => setEditPageId(e.target.value)}
+            >
+              <MenuItem value="">— None —</MenuItem>
+              {pages.map((p) => (
+                <MenuItem key={p.id} value={p.id}>{p.name}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
           <FormControl fullWidth size="small">
             <InputLabel>Assigned View</InputLabel>
             <Select

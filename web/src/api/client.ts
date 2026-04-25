@@ -68,8 +68,26 @@ import type { Device } from '../types';
 export const devicesApi = {
   list: () => api.get<Device[]>('/api/devices'),
   get: (id: string) => api.get<Device>(`/api/devices/${id}`),
+  patch: (id: string, data: Partial<Device>) => api.patch<Device>(`/api/devices/${id}`, data),
   assignView: (deviceId: string, viewId: string) =>
     api.post<void>(`/api/devices/${deviceId}/assign-view`, { viewId }),
+};
+
+// ── Pages ──────────────────────────────────────────────────────────────────────
+
+import type { Page, PagePanel } from '../types';
+
+export type PageCreate = { name: string; swipe_left_page_id?: string; swipe_right_page_id?: string; panels?: Partial<PagePanel>[] };
+export type PageUpdate = Partial<PageCreate> & { floating_config?: Page['floating_config'] };
+
+export const pagesApi = {
+  list: () => api.get<Page[]>('/api/pages'),
+  get: (id: string) => api.get<Page>(`/api/pages/${id}`),
+  create: (data: PageCreate) => api.post<Page>('/api/pages', data),
+  update: (id: string, data: PageUpdate) => api.patch<Page>(`/api/pages/${id}`, data),
+  updatePanels: (id: string, panels: Partial<PagePanel>[]) => api.put<Page>(`/api/pages/${id}/panels`, panels),
+  delete: (id: string) => api.delete<void>(`/api/pages/${id}`),
+  push: (id: string) => api.post<{ pushed_to: number }>(`/api/pages/${id}/push`),
 };
 
 // ── Server ────────────────────────────────────────────────────────────────────
