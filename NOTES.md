@@ -10,120 +10,361 @@
 ```
 canvas-ui-platform/
 ├── server/          Node.js + SQLite  — config store, REST API, WebSocket hub
-├── web/             React SPA         — drag-drop editor, device management UI
+├── web/             React SPA         — drag-drop editor, device/page management UI
 ├── browser/
-│   ├── linux/       Tauri app         — kiosk display client (Linux AppImage)
+│   ├── linux/       Tauri app         — kiosk display client (Linux / RPi AppImage)
 │   └── android/     Tauri app         — kiosk display client (Android APK)
 ```
 
 ### Data Flow
 
 ```
-Home Assistant  ──WebSocket──►  browser app  (live entity states for widgets)
+Home Assistant  ──WebSocket──►  browser app  (live entity states — direct connection)
                                      │
-Canvas UI Server ──WebSocket──►  browser app  (view config, commands)
+Canvas UI Server ──WebSocket──►  browser app  (pages, commands, navigation)
                                      │
-Canvas UI Web   ──REST/WS───►   server        (build views, manage devices)
+Canvas UI Web   ──REST/WS───►   server        (build views, manage devices/pages)
+
+canvas-ui-hacs  ──REST───────►  server        (HA service calls → device commands)
+(HACS integration)
 ```
+
+### Why server-hosted views
+
+The canvas-ui-platform server runs on the same hardware as HA (LAN). It is only unavailable when HA itself is down — in which case entity state is also gone regardless. There is no meaningful offline resilience benefit to caching views on the device; the server is effectively always local.
 
 ---
 
-## ✅ Current Status
+## ✅ Current Status (April 2026)
 
 | Component | Status | Notes |
 |---|---|---|
-| `server/` | ✅ Complete | Views, devices, device_views, commands, data sources, AI proxy, HA proxy, schedules |
+| `server/` | ✅ Complete | Views, devices, commands, AI proxy, HA proxy, schedules |
 | `web/` editor | ✅ Complete | Full drag-drop editor, 35+ widgets, inspector, AI panel |
-| `browser/linux` | 🔲 Not started | Tauri 2, kiosk mode, Linux AppImage |
-| `browser/android` | 🔲 Not started | Tauri 2, Android APK — after Linux is stable |
-| Device management UI | ⚠️ Partial | Server API complete; web UI for assigning views to devices needs work |
+| `browser/linux` | 🔶 In progress | Tauri 2 scaffold done, settings + registration working |
+| `browser/android` | 🔲 Not started | After Linux is stable — Tauri 2 Android target |
+| Device management UI | ✅ Complete | List, edit, assign page, online status |
+| Pages system | 🔲 Not started | See Pages section below |
+| HACS bridge | 🔲 Not started | See HACS Integration Bridge section below |
+| Automations | 🔲 Not started | See Automations section below |
+| Device groups | 🔲 Not started | See Device Groups section below |
 | QR code pairing | 🔲 Not started | Server generates QR; browser app scans on first boot |
+
+---
+
+## 📐 Pages, Panels & WebViews
+
+### Hierarchy
+
+```
+Device
+└── default_page_id
+    Page
+    ├── panels[]: up to 4 regular WebViews
+    │   ├── id (friendly name: "header", "main", "footer")
+    │   ├── position: x%, y%, w%, h%  (percentage of screen)
+    │   ├── content: view_id  OR  url
+    │   └── each independently navigable
+    ├── floating WebView (optional, always on top, show/hide)
+    │   └── content: view_id OR url (e.g. YouTube embed, persistent overlay)
+    ├── swipe_left_page_id  (optional — full page swap on swipe left)
+    └── swipe_right_page_id (optional — full page swap on swipe right)
+```
+
+### Key decisions
+
+- **Swipe = full page swap** — all panels change simultaneously. Sub-pages are independent (own panel layout).
+- **Sub-pages are one level deep** — a page has left/right sub-pages only; no further nesting.
+- **Panel sizing = percentage-based** — x, y, w, h defined as % of screen. Editor shows pixel dimensions based on device's reported screen resolution.
+- **Views designed to fit panels** — set canvas size to match the panel's pixel dimensions (editor shows this as a hint).
+- **Panel IDs are friendly names** — "header", "main", "footer", "sidebar" etc. Used in navigation commands and button actions.
+- **Floating WebView persists across swipe** — stays visible during page transitions unless sub-page defines its own floating config.
+- **Page transition** — slide animation (like phone home screen), deferred to implementation.
+
+### Page data model
+
+```json
+{
+  "id": "page_abc",
+  "name": "Main Dashboard",
+  "swipe_left_page_id": "camera_page",
+  "swipe_right_page_id": "climate_page",
+  "panels": [
+    { "id": "header", "x": 0, "y": 0,  "w": 100, "h": 20, "view_id": "header_view" },
+    { "id": "main",   "x": 0, "y": 20, "w": 100, "h": 60, "view_id": "dashboard_view" },
+    { "id": "footer", "x": 0, "y": 80, "w": 100, "h": 20, "view_id": "nav_view" }
+  ],
+  "floating": {
+    "view_id": null,
+    "url": null,
+    "x": 10, "y": 10, "w": 80, "h": 80,
+    "visible": false
+  }
+}
+```
+
+### DB changes needed
+
+```sql
+CREATE TABLE pages (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  swipe_left_page_id TEXT,
+  swipe_right_page_id TEXT,
+  floating_config TEXT,   -- JSON
+  created_at TEXT,
+  updated_at TEXT
+);
+
+CREATE TABLE page_panels (
+  id TEXT PRIMARY KEY,
+  page_id TEXT NOT NULL REFERENCES pages(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,       -- friendly name: "header", "main" etc
+  x REAL NOT NULL,          -- % 0-100
+  y REAL NOT NULL,
+  w REAL NOT NULL,
+  h REAL NOT NULL,
+  view_id TEXT,             -- NULL if url is set
+  url TEXT,                 -- NULL if view_id is set
+  position INTEGER NOT NULL -- display order
+);
+
+-- devices: add default_page_id (migrate from default_view_id)
+ALTER TABLE devices ADD COLUMN default_page_id TEXT REFERENCES pages(id);
+-- screen resolution (reported by browser app on hello)
+ALTER TABLE devices ADD COLUMN screen_width INTEGER;
+ALTER TABLE devices ADD COLUMN screen_height INTEGER;
+ALTER TABLE devices ADD COLUMN pixel_ratio REAL;
+-- friendly slug for HA service targeting
+ALTER TABLE devices ADD COLUMN slug TEXT UNIQUE;
+```
+
+### Migration from default_view_id
+
+On migrate: auto-create a single-panel full-screen Page for each device that has `default_view_id`. Point `default_page_id` at it. Non-breaking for existing users.
+
+---
+
+## 🖥️ Page Creator UI
+
+New section in the web app alongside the canvas editor: **Pages**.
+
+- Form-based panel editor (name, x%, y%, w%, h%, view/url picker)
+- Live preview: coloured blocks showing panel layout at correct proportions
+- Shows pixel dimensions per panel based on selected device's reported screen resolution
+- Swipe page pickers (left/right sub-pages)
+- Floating WebView config (position, size, initial content, show/hide)
+
+No drag-to-resize for v1 — form + preview is sufficient and faster to build.
 
 ---
 
 ## 📱 Browser App — Design Decisions
 
 ### Settings / First Boot
-- **Local settings screen** is the primary mechanism (always accessible)
-- **QR code** is the fast-path for initial setup — server's device page shows a QR code containing `{ serverUrl, haUrl, haToken, deviceName }`
-- Settings screen appears on first boot (no config stored) or via hidden gesture (5-tap on corner)
-- Config persisted in Tauri's app data dir (`config.json`)
+- Local settings screen — always accessible
+- QR code fast-path: server device page shows QR containing `{ serverUrl, haUrl, haToken, deviceName }`
+- Settings screen on first boot (no config) or hidden gesture (5-tap on corner)
+- Config persisted in Tauri app data dir (`config.json`)
 
-### View Navigation
-- **Button widget action** `navigate_to_view: <view_id>` — tapping a configured button switches views
-- **Swipe gesture** — left/right swipe through the device's assigned view list (configurable, can be disabled per-device)
-- No persistent nav bar by default — UI is fullscreen canvas only
+### Screen resolution reporting
+- On `hello` WS message, device reports `screen_width`, `screen_height`, `pixel_ratio`
+- Server stores on device record — used by Page Creator to show pixel dimensions per panel
 
-### Screen Management (both platforms)
-- Linux: `xset dpms force off/on` + `xrandr --brightness` via Tauri shell sidecar
-- Android: Tauri Android plugin — `WindowManager.LayoutParams.screenBrightness` + wake lock
-- Triggered by WebSocket commands from server: `screen_on`, `screen_off`, `set_brightness`
-- Can also be triggered by HA automations via server
+### Page rendering — Tauri multi-WebView
+- Each panel = a native Tauri WebView, positioned absolutely by Tauri window config
+- Floating = additional WebView, z-order above panels, shown/hidden via Tauri command
+- Each WebView loads: `http://server/display?view=<view_id>` OR external URL
+- Page swipe = slide all panel WebViews out, load new page's WebViews in
+
+### Navigation commands (server → device via WebSocket)
+
+| Command | Payload | Action |
+|---|---|---|
+| `load_page` | `page_id` | Replace entire page layout |
+| `navigate_panel` | `panel_id, view_id OR url` | Load new content into one panel |
+| `show_floating` | `view_id OR url, x, y, w, h` | Show floating WebView |
+| `hide_floating` | — | Hide floating WebView |
+| `show_popup` | `view_id OR url` | Show popup WebView (modal) |
+| `hide_popup` | — | Hide popup WebView |
+| `screen_on` | — | Turn display on |
+| `screen_off` | — | Turn display off |
+| `set_brightness` | `0–100` | Set display brightness |
+| `reload` | — | Full app reload |
+
+### Button widget navigation actions
+
+Buttons send commands **via the server** (not direct Tauri invoke) so they are loggable and can trigger automations:
+
+```
+Button tap in View
+  → POST /api/devices/{id}/command
+  → server: logs, fires automation triggers
+  → WS command to device
+  → Tauri updates target WebView
+```
+
+Example payloads:
+```json
+{ "action": "navigate_panel", "target_panel": "main", "view_id": "climate_view" }
+{ "action": "show_floating", "url": "https://youtube.com/embed/xyz" }
+{ "action": "load_page", "page_id": "camera_page" }
+{ "action": "hide_floating" }
+```
+
+### Screen Management
+- **Linux/RPi**: `xset dpms force off/on` + `/sys/class/backlight/` via Tauri shell
+- **Android**: `PowerManager.WakeLock` + `WindowManager.LayoutParams.screenBrightness` via Tauri plugin
 
 ### HA Entity Data
-- Browser connects **directly** to HA WebSocket (not proxied through server)
-- Needs: HA URL + long-lived access token (set in settings screen or via QR)
-- Reconnects with exponential backoff if HA goes offline
+- Browser connects **directly** to HA WebSocket — not proxied through server
+- Uses `home-assistant-js-websocket` library
+- Constructs full `hass` object — used by canvas-ui widgets AND by LovelaceCardWidget
+- Reconnects with exponential backoff on HA unavailability
 
-### Offline Resilience
-- Last-fetched view data cached locally (Tauri SQLite or JSON file)
-- Display keeps working if server goes down — shows cached view, HA data still live
-- Reconnects to server automatically when it comes back
-
-### Commands (server → device via WebSocket)
-| Command | Action |
-|---|---|
-| `view_change` | Switch to specified view immediately |
-| `reload` | Reload the app / refetch views |
-| `screen_on` | Turn display on |
-| `screen_off` | Turn display off |
-| `set_brightness` | Set brightness 0–100 |
-| `navigate` | Navigate to view by ID or index |
+### Lovelace cards
+- Card JS bundles (`/hacsfiles/...`, `/local/...`) fetched from HA and cached locally on first load
+- `hass` object from direct HA WS connection passed to card custom element
+- If HA is down: card shows error state (identical to HA's own Lovelace behaviour)
 
 ---
 
-## 🗺️ Browser App Build Plan
+## 🔗 HACS Integration Bridge (canvas-ui-hacs → canvas-ui-platform)
 
-### Phase 1 — Linux (AppImage)
-1. [ ] Tauri 2 project scaffold in `browser/linux/`
-2. [ ] Settings screen (server URL, HA URL, HA token, device name)
-3. [ ] Device registration with server on boot (persistent device ID)
-4. [ ] Fetch assigned views from server
-5. [ ] Render canvas using shared React widget renderer
-6. [ ] WebSocket to server — handle commands
-7. [ ] WebSocket to HA — live entity data
-8. [ ] Swipe + button navigation between views
-9. [ ] Screen on/off + brightness via shell commands
-10. [ ] QR code scan for fast pairing
-11. [ ] Offline view caching
-12. [ ] AppImage build + release
+### Purpose
+Expose canvas-ui-platform device commands as **native HA services**, making them available in HA's automation editor with full UI support (device picker, autocomplete, friendly names).
 
-### Phase 2 — Android (APK)
-1. [ ] Tauri 2 Android project in `browser/android/`
-2. [ ] Port settings screen
-3. [ ] Android-specific screen management (wake lock, brightness)
-4. [ ] QR code scan (Android camera)
-5. [ ] APK build + release
+### Discovery
+Auto-discover platform add-on via HA Supervisor API. Falls back to manual URL config.
+
+### HA Services registered
+
+```yaml
+canvas_ui.navigate_page:
+  device_id: kitchen_tablet   # friendly slug, UUID, or group ID
+  page_id: night_mode
+
+canvas_ui.navigate_panel:
+  device_id: kitchen_tablet
+  panel: main
+  view_id: climate_view       # OR url: https://...
+
+canvas_ui.show_floating:
+  device_id: kitchen_tablet
+  view_id: weather_overlay    # OR url: https://...
+
+canvas_ui.hide_floating:
+  device_id: kitchen_tablet
+
+canvas_ui.show_popup:
+  device_id: kitchen_tablet
+  view_id: confirm_dialog
+
+canvas_ui.hide_popup:
+  device_id: kitchen_tablet
+
+canvas_ui.screen_on:
+  device_id: kitchen_tablet   # or group_id: downstairs
+
+canvas_ui.screen_off:
+  device_id: kitchen_tablet
+
+canvas_ui.set_brightness:
+  device_id: kitchen_tablet
+  brightness: 50              # 0-100
+
+canvas_ui.send_notification:  # future
+  device_id: kitchen_tablet
+  message: "Door bell rang"
+  duration: 5
+```
+
+`device_id` accepts: UUID, friendly slug, group ID, or `all`.
+
+### HA Device Registry
+
+HACS integration registers each canvas-ui device as an HA device:
+
+```
+HA Device: "Kitchen Tablet"
+├── sensor.canvas_ui_kitchen_tablet_status       (online / offline)
+├── sensor.canvas_ui_kitchen_tablet_current_page (page name)
+└── sensor.canvas_ui_kitchen_tablet_current_view (active view names)
+```
+
+Example HA automation using device entities:
+```yaml
+trigger:
+  platform: state
+  entity_id: sensor.canvas_ui_kitchen_tablet_status
+  to: online
+action:
+  service: canvas_ui.navigate_page
+  data:
+    device_id: kitchen_tablet
+    page_id: welcome_page
+```
+
+### Back-channel: platform → HA (webhook)
+
+Platform fires HA webhooks for events:
+- `canvas_ui_button_pressed` — `{ device_id, widget_id, action_data }`
+- `canvas_ui_device_online`
+- `canvas_ui_device_offline`
+
+Enables: button presses on tablets triggering HA automations (lights, scenes, etc.).
+
+### Auth
+Supervisor token for local add-on discovery. Direct REST calls to platform trust Supervisor-originated requests on LAN.
 
 ---
 
-## 🖥️ Device Management Web UI — Gaps
+## 👥 Device Groups
 
-The server API is complete. The web editor needs:
-- [ ] Device list page — show all registered devices, online status, last seen
-- [ ] Device detail — assign/reorder views, rename, send commands
-- [ ] View assignment drag-drop — drag views onto devices
-- [ ] QR code display for each device (for fast browser app pairing)
+Devices can be assigned to named groups (e.g. "Downstairs Displays", "Bedrooms").
+
+- All service calls accept `group_id` as alternative to `device_id`
+- Special group `all` targets every registered device
+- Groups managed in Devices section of web UI
+- DB: `device_groups` + `device_group_members` tables
 
 ---
 
-## 🤖 AI Panel
-- Server-side proxy: ✅ Complete (`/api/ai/chat`, `/api/ai/settings`, `/api/ai/models`)
-- Client AIService: ✅ Complete
-- AIPanel + AISettingsDialog: ✅ Complete
-- Wired into EditorSidebar: ✅ Complete
-- Providers: OpenAI, GitHub Models, Groq, OpenWebUI, Copilot Proxy (Coxy)
-- Status: Needs real-world testing / bug fixing
+## 🤖 Automations (platform-native)
+
+Lightweight automation engine inside the add-on, complementing HA automations.
+
+### Trigger types
+- **Time/cron** — "every day at 22:00"
+- **HA entity state** — via HA WS subscription
+- **Device event** — device comes online, button pressed
+- **Manual** — from Automations UI or REST API
+
+### Condition types
+- Time range
+- HA entity state
+- Device currently on page X
+
+### Action types
+All WS commands above. Target: single device, group, or `all`.
+
+### Example automations
+
+```
+Night Mode
+  Trigger: Time → 22:00 daily
+  Actions:
+    navigate_page  → Kitchen Tablet → night_dashboard
+    set_brightness → Kitchen Tablet → 20%
+    navigate_page  → Bedroom Tablet → sleep_mode
+
+Alert Mode
+  Trigger: HA entity → alarm_control_panel.home = triggered
+  Actions:
+    navigate_page  → group:all → security_alert_page
+    screen_on      → group:all
+    set_brightness → group:all → 100%
+```
 
 ---
 
@@ -134,15 +375,71 @@ The server API is complete. The web editor needs:
 | Server | Node.js, Fastify, better-sqlite3, nanoid |
 | Web editor | React 19, TypeScript, Vite, Material-UI |
 | Browser app | Tauri 2 (Rust shell + React frontend) |
-| Database | SQLite (server), optional local SQLite on device |
-| Realtime | WebSocket (server↔browser, browser↔HA) |
+| HA entity data | home-assistant-js-websocket (direct from device) |
+| Database | SQLite (server) |
+| Realtime | WebSocket (server↔device, device↔HA) |
 | Build/release | GitHub Actions, `release.sh` |
 
 ---
 
-## 📋 Open Questions
+## 🗺️ Build Roadmap
 
-- **MQTT** — Is there value in MQTT as an alternative/complement to WebSocket commands? Useful if devices are behind NAT and can't be reached directly by server. Deferred for now — WebSocket server-push covers the use case while devices are on the same LAN.
-- **Multi-view per device** — Current DB has `default_view_id` + `device_views` join table. Browser app works off `device_views` list. ✅ Schema supports it.
-- **View transitions** — Instant switch or animated slide between views? Decision deferred to implementation.
-- **Authentication** — Server currently has no auth. Fine for LAN use; needs consideration for remote access.
+### Phase 1 — Pages system (server + web UI)
+- [ ] DB migration: `pages`, `page_panels` tables + device slug/resolution columns
+- [ ] REST API: CRUD for pages + panels
+- [ ] Page Creator UI in web app
+- [ ] Device assignment: `default_page_id` replaces `default_view_id`
+- [ ] Server pushes `load_page` to device on assignment change
+- [ ] Migration: auto-create single-panel pages for existing device assignments
+
+### Phase 2 — Browser app: multi-WebView pages
+- [ ] Screen resolution reporting in `hello` message
+- [ ] Tauri multi-WebView: create/position WebViews per panel config
+- [ ] Page swipe: slide transition, load sub-page
+- [ ] Floating WebView: show/hide, load URL or view
+- [ ] WS command handler for all navigation commands
+
+### Phase 3 — Navigation from widgets
+- [ ] Button widget: new action types (`navigate_panel`, `load_page`, `show_floating` etc.)
+- [ ] Commands routed via server (loggable, automation-triggerable)
+- [ ] Server command log
+
+### Phase 4 — HACS integration bridge
+- [ ] Auto-discover platform add-on via Supervisor API
+- [ ] Register HA services (navigate_page, screen_on/off etc.)
+- [ ] Register HA devices + status/page entities
+- [ ] Webhook back-channel: button presses → HA automations
+
+### Phase 5 — Automations
+- [ ] Automation engine in server
+- [ ] Automations UI in web app
+- [ ] HA entity state triggers via HA WS
+
+### Phase 6 — Device groups
+- [ ] `device_groups` + `device_group_members` DB tables
+- [ ] Group management UI
+- [ ] Group targeting in all service calls
+
+### Phase 7 — Android
+- [ ] Tauri 2 Android target in `browser/android/`
+- [ ] Android screen management (wake lock, brightness)
+- [ ] APK build + release
+
+---
+
+## 🤖 AI Panel
+- Server-side proxy: ✅ Complete (`/api/ai/chat`, `/api/ai/settings`, `/api/ai/models`)
+- Client AIService: ✅ Complete
+- Providers: OpenAI, GitHub Models, Groq, OpenWebUI, Copilot Proxy
+- Status: Needs real-world testing
+
+---
+
+## 📋 Deferred / Open
+
+- **MQTT** — deferred; WebSocket covers LAN use case
+- **View transitions** — slide animation on page swipe (implementation detail, deferred to Phase 2)
+- **Authentication** — server has no auth; fine for LAN; needs consideration for remote access
+- **Lovelace card converter** — import Lovelace YAML → native canvas-ui widgets (best-effort, top 10 card types). Deferred post-Phase 3.
+- **View auto-scale** — CSS transform to fit any view into a panel regardless of canvas size. Deferred; designer sets canvas size to match panel for now.
+- **Deep swipe nesting** — sub-pages of sub-pages. Deferred; one level only for now.
