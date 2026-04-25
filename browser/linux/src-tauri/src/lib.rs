@@ -1,4 +1,4 @@
-use tauri::AppHandle;
+use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::ShellExt;
 
 /// Turn the display off using xset (Linux only)
@@ -59,6 +59,26 @@ async fn keep_screen_on(app: AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+/// Navigate an existing WebviewWindow to a new URL.
+/// Used by KioskScreen to implement navigate_panel without closing/reopening.
+#[tauri::command]
+async fn navigate_webview(app: AppHandle, label: String, url: String) -> Result<(), String> {
+    let win = app.get_webview_window(&label)
+        .ok_or_else(|| format!("No webview with label '{}'", label))?;
+    let parsed = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
+    win.navigate(parsed).map_err(|e| e.to_string())
+}
+
+/// Close a WebviewWindow by label.
+#[tauri::command]
+fn close_webview(app: AppHandle, label: String) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window(&label) {
+        win.close().map_err(|e| e.to_string())
+    } else {
+        Ok(()) // already gone
+    }
+}
+
 /// Get the app version from Cargo.toml
 #[tauri::command]
 fn app_version(app: AppHandle) -> String {
@@ -76,6 +96,8 @@ pub fn run() {
             set_brightness,
             keep_screen_on,
             app_version,
+            navigate_webview,
+            close_webview,
         ])
         .setup(|app| {
             // Disable screen saver and DPMS on launch for kiosk mode
