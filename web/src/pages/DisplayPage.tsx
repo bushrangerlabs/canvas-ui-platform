@@ -21,9 +21,27 @@ import type { ViewConfig, WsInboundMessage, WsOutboundMessage, Schedule, Device,
 export default function DisplayPage() {
   const [searchParams] = useSearchParams();
   const deviceId = searchParams.get('device') ?? 'browser';
+  const staticViewId = searchParams.get('view');   // panel-mode: view is pre-determined
 
   const [view, setView] = useState<ViewConfig | null>(null);
   const [status, setStatus] = useState<'connecting' | 'connected' | 'error'>('connecting');
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+
+  const dbg = (msg: string) => {
+    console.log('[DisplayPage]', msg);
+    setDebugLog(prev => [...prev.slice(-8), `${new Date().toISOString().slice(11,19)} ${msg}`]);
+  };
+
+  // If a ?view= param is present, fetch and display it immediately (no WS push needed)
+  useEffect(() => {
+    dbg(`init — device="${deviceId}" staticViewId="${staticViewId ?? 'none'}" url="${window.location.href}"`);
+    if (!staticViewId) { dbg('no ?view= param, waiting for WS push'); return; }
+    dbg(`fetching /api/views/${staticViewId}…`);
+    api.get<ServerView>(`/api/views/${staticViewId}`)
+      .then(sv => { dbg(`got view "${sv.name}" (${sv.id})`); setView(sv.view_data); })
+      .catch(err => { dbg(`FETCH ERROR: ${err?.message ?? String(err)}`); });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [staticViewId]);
   const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
   // Schedule state
@@ -101,14 +119,18 @@ export default function DisplayPage() {
 
   const sendRef = useRef<((msg: WsOutboundMessage) => void) | null>(null);
 
+  const staticViewIdRef = useRef(staticViewId);
+  staticViewIdRef.current = staticViewId;
+
   const onMessage = useCallback((msg: WsInboundMessage) => {
+    dbg(`WS msg: ${msg.type}`);
     switch (msg.type) {
       case 'hello_ack':
         setStatus('connected');
         loadSchedule();
         break;
       case 'view_change':
-        // Manual WS override — clear schedule and show this view
+        dbg(`view_change: ${msg.viewId}`);
         if (scheduleTimerRef.current) {
           clearTimeout(scheduleTimerRef.current);
           scheduleTimerRef.current = null;
@@ -116,10 +138,20 @@ export default function DisplayPage() {
         setScheduleViews([]);
         setView(msg.viewData);
         break;
+      case 'view_updated':
+        if (staticViewIdRef.current && msg.view_id === staticViewIdRef.current) {
+          dbg(`view_updated, re-fetching ${msg.view_id}`);
+          api.get<ServerView>(`/api/views/${msg.view_id}`)
+            .then(sv => setView(sv.view_data))
+            .catch(() => {});
+        }
+        break;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadSchedule]);
 
   const onOpen = useCallback(() => {
+    dbg(`WS open, sending hello device_id="${deviceId}"`);
     sendRef.current?.({ type: 'hello', client_type: 'browser', device_id: deviceId });
   }, [deviceId]);
 
@@ -150,11 +182,18 @@ export default function DisplayPage() {
         <Box
           sx={{
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             height: '100%',
+            gap: 2,
           }}
         >
+          {debugLog.length > 0 && (
+            <Box sx={{ position: 'absolute', top: 8, left: 8, right: 8, bgcolor: 'rgba(0,0,0,0.85)', borderRadius: 1, p: 1, fontFamily: 'monospace', fontSize: 11, color: '#0f0', zIndex: 9999 }}>
+              {debugLog.map((line, i) => <div key={i}>{line}</div>)}
+            </Box>
+          )}
           <Typography color="text.secondary" variant="h6">
             {status === 'connecting' ? 'Connecting to server…' : 'Waiting for view assignment…'}
           </Typography>

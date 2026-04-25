@@ -207,6 +207,7 @@ export type WsInboundMessage =
   | { type: 'ha_state_update'; entity_id: string; state: string; attributes: Record<string, any>; last_updated?: string; last_changed?: string }
   | { type: 'command'; id: number; device_id: string; action: string; payload: Record<string, any> }
   | { type: 'load_page'; page_id: string; page_data: Page }
+  | { type: 'view_updated'; view_id: string; updated_at: string }
   | { type: 'pong' };
 
 export type WsOutboundMessage =
