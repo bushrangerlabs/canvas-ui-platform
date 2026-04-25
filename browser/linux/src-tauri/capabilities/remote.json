@@ -1,0 +1,11 @@
+{
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
+  "identifier": "remote",
+  "local": false,
+  "windows": ["panel-*", "floating"],
+  "permissions": [
+    "core:default",
+    "notification:default",
+    "store:default"
+  ]
+}
