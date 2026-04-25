@@ -39,7 +39,14 @@ export function useServerSocket({ serverUrl, deviceId, enabled, onCommand }: Opt
         console.log('[ServerSocket] Connected');
         retryDelay.current = 1000; // reset backoff
         // Announce ourselves — field names must match the server's hello handler
-        ws.send(JSON.stringify({ type: 'hello', client_type: 'browser', device_id: deviceId }));
+        ws.send(JSON.stringify({
+          type: 'hello',
+          client_type: 'browser',
+          device_id: deviceId,
+          screen_width: window.screen.width,
+          screen_height: window.screen.height,
+          pixel_ratio: window.devicePixelRatio,
+        }));
       };
 
       ws.onmessage = (e) => {

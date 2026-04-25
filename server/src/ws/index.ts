@@ -115,11 +115,22 @@ function handleMessage(ws: WebSocket, msg: any): void {
       console.log(`[ws] Hello from ${client.clientType}${client.deviceId ? ` (${client.deviceId})` : ''}`);
       send(ws, { type: 'hello_ack', server_version: '0.1.0' });
 
-      // For browser clients, push their assigned view immediately
+      // Persist screen dimensions if provided
+      if (client.clientType === 'browser' && client.deviceId && msg.screen_width) {
+        try {
+          const db = getDb();
+          db.prepare('UPDATE devices SET screen_width=?, screen_height=?, pixel_ratio=? WHERE id=?')
+            .run(msg.screen_width, msg.screen_height ?? null, msg.pixel_ratio ?? null, client.deviceId);
+        } catch { /* non-critical */ }
+      }
+
+      // For browser clients, push their assigned view and/or page immediately
       if (client.clientType === 'browser' && client.deviceId) {
         try {
           const db = getDb();
-          const device = db.prepare('SELECT default_view_id FROM devices WHERE id = ?').get(client.deviceId) as any;
+          const device = db.prepare('SELECT default_view_id, default_page_id FROM devices WHERE id = ?').get(client.deviceId) as any;
+
+          // Push assigned view
           if (device?.default_view_id) {
             const row = db.prepare('SELECT * FROM views WHERE id = ?').get(device.default_view_id) as any;
             if (row) {
@@ -127,8 +138,18 @@ function handleMessage(ws: WebSocket, msg: any): void {
               send(ws, { type: 'view_change', viewId: row.id, viewData });
             }
           }
+
+          // Push assigned page (takes precedence for panel-based layout)
+          if (device?.default_page_id) {
+            const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(device.default_page_id) as any;
+            if (page) {
+              const panels = db.prepare('SELECT * FROM page_panels WHERE page_id=? ORDER BY position').all(device.default_page_id);
+              const pageData = { ...page, floating_config: page.floating_config ? JSON.parse(page.floating_config) : null, panels };
+              send(ws, { type: 'load_page', page_id: device.default_page_id, page_data: pageData });
+            }
+          }
         } catch (err) {
-          console.warn('[ws] Failed to push initial view:', err);
+          console.warn('[ws] Failed to push initial view/page:', err);
         }
       }
       break;
