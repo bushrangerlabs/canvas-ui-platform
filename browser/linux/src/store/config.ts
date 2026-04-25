@@ -25,7 +25,7 @@ let _store: Store | null = null;
 
 async function getStore(): Promise<Store> {
   if (!_store) {
-    _store = await Store.load('config.json', { autoSave: true });
+    _store = await Store.load('config.json', { autoSave: true, defaults: {} });
   }
   return _store;
 }
