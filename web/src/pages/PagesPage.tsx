@@ -141,6 +141,11 @@ function PanelEditDialog({ open, panel, views, onClose, onSave }: PanelDialogPro
             onChange={e => { set('url', e.target.value || undefined); if (e.target.value) set('view_id', undefined); }}
             placeholder="https://example.com"
             fullWidth
+            helperText={
+              val.url && (val.url.includes(':8123') || val.url.includes('homeassistant'))
+                ? `HA pages block iframe embedding — use /proxy?url=${encodeURIComponent(val.url)} to strip X-Frame-Options`
+                : 'Tip: wrap HA URLs with /proxy?url=<encoded-url> to bypass X-Frame-Options'
+            }
           />
         </Stack>
       </DialogContent>
