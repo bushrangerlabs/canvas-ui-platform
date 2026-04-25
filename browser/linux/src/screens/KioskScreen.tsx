@@ -73,18 +73,9 @@ async function closeAllPanelWindows() {
   );
 }
 
-function resolvePanelUrl(panel: PagePanel, config: AppConfig, deviceId: string, haIngressPath: string | null): string {
-  if (panel.url) return panel.url;   // native WebviewWindow has no X-Frame-Options restriction
-  // For view panels, load via HA ingress so Lovelace cards can access HA frontend
-  if (panel.view_id) {
-    if (haIngressPath && config.haUrl) {
-      return `${config.haUrl}${haIngressPath}display?view=${encodeURIComponent(panel.view_id)}`;
-    }
-    return `${config.serverUrl}/display?view=${encodeURIComponent(panel.view_id)}`;
-  }
-  if (haIngressPath && config.haUrl) {
-    return `${config.haUrl}${haIngressPath}display?device=${encodeURIComponent(deviceId)}`;
-  }
+function resolvePanelUrl(panel: PagePanel, config: AppConfig, deviceId: string): string {
+  if (panel.url) return panel.url;
+  if (panel.view_id) return `${config.serverUrl}/display?view=${encodeURIComponent(panel.view_id)}`;
   return `${config.serverUrl}/display?device=${encodeURIComponent(deviceId)}`;
 }
 
@@ -98,23 +89,6 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
   const [errorMsg, setErrorMsg]     = useState('');
   const [deviceId, setDeviceId]     = useState(config.deviceId ?? '');
   const [loadedPage, setLoadedPage] = useState<LoadedPage | null>(null);
-  const [haIngressPath, setHaIngressPath] = useState<string | null>(null);
-
-  // Fetch HA ingress path from server so panel windows load via HA ingress
-  // (gives them access to HA frontend — required for Lovelace card widgets)
-  useEffect(() => {
-    fetch(`${config.serverUrl}/api/ingress-info`)
-      .then(r => r.json())
-      .then((d: any) => {
-        if (d?.ingress_url) {
-          // Ensure trailing slash
-          const p = d.ingress_url.endsWith('/') ? d.ingress_url : d.ingress_url + '/';
-          setHaIngressPath(p);
-          console.log('[KioskScreen] HA ingress path:', p);
-        }
-      })
-      .catch(() => { /* not an add-on or supervisor unreachable — panels use direct URL */ });
-  }, [config.serverUrl]);
 
   const panelLabelsRef   = useRef<string[]>([]);
   const tapTimestamps    = useRef<number[]>([]);
@@ -189,7 +163,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
 
     for (const panel of panels) {
       const label = `panel-${panel.id}`;
-      const url   = resolvePanelUrl(panel, config, deviceId, haIngressPath);
+      const url   = resolvePanelUrl(panel, config, deviceId);
 
       const win = new WebviewWindow(label, {
         url,
@@ -222,7 +196,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       });
       fl.once('tauri://error', e => console.error('[floating] error:', e));
     }
-  }, [config, deviceId, haIngressPath]);
+  }, [config, deviceId]);
 
   // ── WS command handler ───────────────────────────────────────────────────
   const handleCommand = useCallback(async (cmd: Record<string, any>) => {
@@ -314,11 +288,8 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       if (existing) return;
       const sw = window.screen.width;
       const sh = window.screen.height;
-      const fallbackUrl = haIngressPath && config.haUrl
-        ? `${config.haUrl}${haIngressPath}display?device=${encodeURIComponent(deviceId)}`
-        : `${config.serverUrl}/display?device=${encodeURIComponent(deviceId)}`;
       const fallback = new WebviewWindow(label, {
-        url: fallbackUrl,
+        url: `${config.serverUrl}/display?device=${encodeURIComponent(deviceId)}`,
         x: window.screenX ?? 0,
         y: window.screenY ?? 0,
         width: sw, height: sh,
@@ -327,7 +298,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       fallback.once('tauri://error', e => console.error('[fallback] error:', e));
       panelLabelsRef.current = [label];
     });
-  }, [appState, deviceId, loadedPage, config.serverUrl, config.haUrl, haIngressPath]);
+  }, [appState, deviceId, loadedPage, config.serverUrl]);
 
   // ── Render ────────────────────────────────────────────────────────────────
 
