@@ -87,6 +87,8 @@ const SETTINGS_TAP_WINDOW_MS = 3000;
 export default function KioskScreen({ config, onResetConfig }: Props) {
   const [appState, setAppState]     = useState<AppState>('registering');
   const [errorMsg, setErrorMsg]     = useState('');
+  const [retryCount, setRetryCount] = useState(0);
+  const retryTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [deviceId, setDeviceId]     = useState(config.deviceId ?? '');
   const [loadedPage, setLoadedPage] = useState<LoadedPage | null>(null);
 
@@ -154,9 +156,13 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
   // Cleanup on unmount
   useEffect(() => () => { closeAllPanelWindows(); }, []);
 
-  // ── Device registration ─────────────────────────────────────────────────
+  // ── Device registration with automatic retry ──────────────────────────
+  // Retries indefinitely with capped backoff — handles the kiosk starting
+  // before the server (add-on) is ready.
   useEffect(() => {
-    async function register() {
+    let cancelled = false;
+
+    async function attempt(n: number) {
       try {
         const id = config.deviceId || nanoid(10);
         const res = await fetch(`${config.serverUrl}/api/devices/register`, {
@@ -174,16 +180,28 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         });
         if (!res.ok) throw new Error(`Registration failed: ${res.status}`);
         const device = await res.json();
+        if (cancelled) return;
         await saveDeviceId(device.id);
         setDeviceId(device.id);
+        setRetryCount(0);
         setAppState('ready');
       } catch (e) {
-        setErrorMsg(`Cannot reach server at ${config.serverUrl}\n\n${String(e)}`);
-        setAppState('error');
+        if (cancelled) return;
+        const delay = Math.min(2000 * Math.pow(1.5, n), 30000); // 2s→30s cap
+        setRetryCount(n + 1);
+        setErrorMsg(String(e));
+        retryTimerRef.current = setTimeout(() => {
+          if (!cancelled) attempt(n + 1);
+        }, delay);
       }
     }
-    register();
-  }, [config.serverUrl, config.deviceId, config.deviceName]);
+
+    attempt(0);
+    return () => {
+      cancelled = true;
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+    };
+  }, [config.serverUrl, config.deviceId, config.deviceName]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Open native WebviewWindow panels ─────────────────────────────────────
   const openPanelWindows = useCallback(async (panels: PagePanel[], floating: FloatingConfig | null) => {
@@ -373,11 +391,23 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
 
   if (appState === 'registering') {
     return (
-      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#0a0a0a', flexDirection: 'column', gap: 2 }}>
+      <Box sx={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', bgcolor: '#0a0a0a', flexDirection: 'column', gap: 2, p: 4 }}>
         <CircularProgress size={40} />
         <Typography color="text.secondary" variant="body2">
-          Connecting to {config.serverUrl}…
+          {retryCount === 0
+            ? `Connecting to ${config.serverUrl}…`
+            : `Retrying… (attempt ${retryCount + 1})`}
         </Typography>
+        {retryCount > 0 && (
+          <Typography color="error" variant="caption" sx={{ maxWidth: 480, textAlign: 'center', opacity: 0.7 }}>
+            {errorMsg}
+          </Typography>
+        )}
+        {retryCount >= 3 && (
+          <Button variant="outlined" size="small" onClick={() => setAppState('settings')} sx={{ mt: 1 }}>
+            Open Settings
+          </Button>
+        )}
       </Box>
     );
   }
