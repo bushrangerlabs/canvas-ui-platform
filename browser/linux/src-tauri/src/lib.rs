@@ -104,6 +104,9 @@ fn create_panel_webview(
     title: String,
     visible: bool,
     ingress_session: Option<String>,
+    // Additional initialization script injected after the ingress cookie script.
+    // Used by the kiosk to load the canvas view inside the HA frontend document.
+    init_script: Option<String>,
 ) -> Result<(), String> {
     let parsed_url = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
     let app_handle = app.clone();
@@ -134,6 +137,10 @@ fn create_panel_webview(
                 r#"document.cookie = "ingress_session={}; path=/; max-age=3600";"#,
                 safe_session
             );
+            builder = builder.initialization_script(&script);
+        }
+
+        if let Some(script) = init_script {
             builder = builder.initialization_script(&script);
         }
 

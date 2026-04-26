@@ -63,7 +63,51 @@ interface Props {
 function pct(percent: number, total: number) {
   return Math.round((percent / 100) * total);
 }
+/**
+ * Builds the initialization_script that:
+ * 1. Stores the HA long-lived token in localStorage so HA's frontend auto-logs in.
+ * 2. On DOMContentLoaded, hides HA's chrome and injects a full-screen iframe
+ *    pointing to the canvas display view via HA ingress (same origin as the parent
+ *    HA frontend window → window.parent.customElements.get('ha-card') works).
+ */
+function buildHAKioskScript(params: {
+  haUrl: string;
+  haToken: string;
+  iframeSrc: string;
+}): string {
+  // Long-lived tokens don't expire — fake an expiry far in the future so HA's
+  // frontend auth module won't try to refresh (which requires a refresh_token).
+  const hassTokens = JSON.stringify({
+    access_token:  params.haToken,
+    token_type:    'Bearer',
+    expires_in:    99999999,
+    hassUrl:       params.haUrl,
+    clientId:      `${params.haUrl}/`,
+    expires:       new Date('2099-01-01').getTime(),
+    refresh_token: '',
+  });
+  const iframeSrc  = JSON.stringify(params.iframeSrc);
+  const tokensJson = JSON.stringify(hassTokens);
 
+  return `(function(){
+  try{ localStorage.setItem('hassTokens', ${tokensJson}); }catch(e){}
+  function setup(){
+    var s=document.createElement('style');
+    s.textContent='ha-sidebar,ha-drawer,app-header,app-toolbar,.header,[slot="toolbar"],ha-menu-button,paper-icon-button{display:none!important}body,html{margin:0;padding:0;overflow:hidden;width:100%;height:100%}';
+    (document.head||document.documentElement).appendChild(s);
+    var f=document.createElement('iframe');
+    f.src=${iframeSrc};
+    f.style.cssText='position:fixed;top:0;left:0;width:100vw;height:100vh;border:none;z-index:2147483647;background:#000;pointer-events:auto;';
+    f.allow='autoplay; fullscreen';
+    document.body.appendChild(f);
+  }
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded',setup);
+  }else{
+    setTimeout(setup,0);
+  }
+})();`;
+}
 async function closeAllPanelWindows() {
   const all = await WebviewWindow.getAll();
   await Promise.all(
@@ -217,31 +261,43 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       const label = `panel-${panel.id}`;
       const directUrl = resolvePanelUrl(panel, config, deviceId);
 
-      // If a panel has a view (canvas content) and ingress is available,
-      // load via HA ingress so Lovelace card widgets can access HA frontend.
-      // External URL panels (panel.url set) always load directly.
+      // If a panel has a view (canvas content) and HA ingress is available,
+      // load the panel by opening HA's actual frontend (ha:8123/lovelace) in the
+      // WebviewWindow. An initialization_script:
+      //   1. Sets localStorage hassTokens for HA auto-login (using the long-lived token)
+      //   2. Sets the ingress_session cookie for the iframe's ingress request
+      //   3. On DOMContentLoaded, hides HA chrome and injects a full-screen iframe
+      //      pointing to the canvas display via HA ingress.
+      // Because both the parent (ha:8123/lovelace) and the iframe
+      // (ha:8123/api/hassio_ingress/.../display) share origin ha:8123, the iframe
+      // can access window.parent.customElements.get('ha-card') → Lovelace works.
       const ingress = ingressRef.current;
-      const useIngress = !panel.url && ingress;
-      const url = useIngress
-        ? `${ingress.haUrl}${ingress.ingressPath}display?view=${encodeURIComponent(panel.view_id ?? '')}&device=${encodeURIComponent(deviceId)}`
-        : directUrl;
+      const useIngress = !panel.url && ingress && config.haToken;
 
       if (useIngress) {
-        // Use Rust command to inject ingress_session cookie before page load
+        const iframeSrc = `${ingress!.haUrl}${ingress!.ingressPath}display?view=${encodeURIComponent(panel.view_id ?? '')}&device=${encodeURIComponent(deviceId)}`;
+        const haFrontendUrl = `${ingress!.haUrl}/lovelace`;
+        const initScript = buildHAKioskScript({
+          haUrl:     ingress!.haUrl,
+          haToken:   config.haToken!,
+          iframeSrc,
+        });
+
         invoke('create_panel_webview', {
           label,
-          url,
-          x: ox + pct(panel.x, sw),
-          y: oy + pct(panel.y, sh),
-          width: pct(panel.w, sw),
-          height: pct(panel.h, sh),
-          title: panel.name,
-          visible: true,
-          ingressSession: ingress.session,
+          url:           haFrontendUrl,
+          x:             ox + pct(panel.x, sw),
+          y:             oy + pct(panel.y, sh),
+          width:         pct(panel.w, sw),
+          height:        pct(panel.h, sh),
+          title:         panel.name,
+          visible:       true,
+          ingressSession: ingress!.session,
+          initScript,
         }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
       } else {
         const win = new WebviewWindow(label, {
-          url,
+          url: directUrl,
           x:      ox + pct(panel.x, sw),
           y:      oy + pct(panel.y, sh),
           width:  pct(panel.w, sw),
