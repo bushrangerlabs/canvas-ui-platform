@@ -159,6 +159,22 @@ pub fn run() {
             create_panel_webview,
         ])
         .setup(|app| {
+            // Disable hardware acceleration for the main window on Linux.
+            // WebKitGTK 2.44+ hardware compositing (GPU process + DMA-buf) crashes
+            // on many kiosk/embedded systems. Software rendering is stable.
+            #[cfg(target_os = "linux")]
+            if let Some(win) = app.get_webview_window("main") {
+                let _ = win.with_webview(|wv| {
+                    use webkit2gtk::{SettingsExt, WebViewExt};
+                    let wk = wv.inner();
+                    if let Some(settings) = wk.settings() {
+                        settings.set_hardware_acceleration_policy(
+                            webkit2gtk::HardwareAccelerationPolicy::Never,
+                        );
+                    }
+                });
+            }
+
             // Disable screen saver and DPMS on launch for kiosk mode
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
