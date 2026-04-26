@@ -63,7 +63,7 @@ function getFullHass(): any {
   return (window as any).hass;
 }
 
-function waitForHass(timeoutMs = 6000): Promise<any> {
+function waitForHass(timeoutMs = 30000): Promise<any> {
   return new Promise((resolve, reject) => {
     const deadline = Date.now() + timeoutMs;
     const check = () => {
@@ -150,8 +150,6 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
         cardRef.current = null;
       }
 
-      const haWin = getHAWindow();
-
       try {
         const parsed = parseCardConfig(cardConfig);
         if (parsed === null) throw new Error('Invalid card config (bad YAML/JSON)');
@@ -165,8 +163,13 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
           ...(entity_id ? { entity: entity_id } : {}),
         };
 
+        // Wait for HA frontend to be ready BEFORE resolving haWin — with JSC JIT disabled
+        // the parent HA lovelace page can take 20+ seconds to register ha-card.
         const hassObj = await waitForHass();
         if (cancelled) return;
+
+        // Resolve haWin AFTER waitForHass so ha-card is guaranteed registered in window.parent.
+        const haWin = getHAWindow();
 
         // Create card element via loadCardHelpers (preferred — works for all built-in cards)
         // createCardElement internally calls setConfig, so we must NOT call it again.
