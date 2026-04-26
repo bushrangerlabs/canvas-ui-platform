@@ -221,6 +221,10 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
           portalDiv.appendChild(cardEl);
           portalRef.current = portalDiv;
 
+          // Set hass immediately after the card is in haWin's document so
+          // Lit's connectedCallback sees hass right away.
+          (cardEl as any).hass = hassObj;
+
           const syncPosition = () => {
             if (!containerRef.current || !portalDiv.isConnected) return;
             const rect = containerRef.current.getBoundingClientRect();
@@ -306,15 +310,21 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
   }, [cardType, entity_id, cardConfig, refreshInterval]);
 
   // Keep hass up-to-date on the mounted card so entity states refresh.
+  // Poll at 200ms for the first 5s (initial render), then slow to 2s.
   useEffect(() => {
+    let slowIv: ReturnType<typeof setInterval> | undefined;
     const tick = () => {
       const h = getFullHass();
-      if (h && cardRef.current && (cardRef.current as any).hass !== undefined) {
+      if (h && cardRef.current) {
         (cardRef.current as any).hass = h;
       }
     };
-    const iv = setInterval(tick, 2000);
-    return () => clearInterval(iv);
+    const fastIv = setInterval(tick, 200);
+    const slowTimer = setTimeout(() => {
+      clearInterval(fastIv);
+      slowIv = setInterval(tick, 2000);
+    }, 5000);
+    return () => { clearInterval(fastIv); clearTimeout(slowTimer); if (slowIv) clearInterval(slowIv); };
   }, []);
 
   // Keep portal pointer-events in sync with edit mode changes
