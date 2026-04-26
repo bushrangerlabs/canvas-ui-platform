@@ -36,8 +36,25 @@ function getHAWindow(): Window {
   return (best as any).customElements?.get('ha-card') ? best : window;
 }
 
+/**
+ * Get the hass bridge installed by the Tauri kiosk init script.
+ * The bridge runs in the HA lovelace parent window's JS realm, so calling
+ * setHass(el) avoids WebKit cross-realm property setter restrictions.
+ */
+function hassbridge(): { getHass(): any; setHass(el: HTMLElement): void } | null {
+  try {
+    const b = (window.parent as any).__canvas_hass_bridge;
+    return b ?? null;
+  } catch { return null; }
+}
+
 // Walk up the window hierarchy to find the real HA hass object.
 function getFullHass(): any {
+  // Prefer bridge (parent realm, avoids cross-realm type coercion in WebKit)
+  try {
+    const b = hassbridge();
+    if (b) { const h = b.getHass(); if (h) return h; }
+  } catch { /* ignore */ }
   let win: Window = window;
   let checkedTop = false;
   // 1. <home-assistant>.hass
@@ -203,7 +220,7 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
         if (!configAlreadySet && (cardEl as any).setConfig) {
           (cardEl as any).setConfig(fullConfig);
         }
-        (cardEl as any).hass = hassObj;
+        // hass will be assigned after the card is appended to the portal (below)
 
         if (!containerRef.current || cancelled) return;
         cardRef.current = cardEl;
@@ -223,7 +240,14 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
 
           // Set hass immediately after the card is in haWin's document so
           // Lit's connectedCallback sees hass right away.
-          (cardEl as any).hass = hassObj;
+          // Use the bridge when available so the assignment runs in the parent
+          // window's JS realm (avoids WebKit cross-realm property restrictions).
+          const bridge = hassbridge();
+          if (bridge) {
+            bridge.setHass(cardEl);
+          } else {
+            (cardEl as any).hass = hassObj;
+          }
 
           const syncPosition = () => {
             if (!containerRef.current || !portalDiv.isConnected) return;
@@ -316,7 +340,12 @@ const LovelaceCardWidget: React.FC<WidgetProps> = ({ config, isEditMode }) => {
     const tick = () => {
       const h = getFullHass();
       if (h && cardRef.current) {
-        (cardRef.current as any).hass = h;
+        const bridge = hassbridge();
+        if (bridge) {
+          bridge.setHass(cardRef.current);
+        } else {
+          (cardRef.current as any).hass = h;
+        }
       }
     };
     const fastIv = setInterval(tick, 200);

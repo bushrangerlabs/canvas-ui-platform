@@ -101,6 +101,18 @@ function buildHAKioskScript(params: {
     f.allow='autoplay; fullscreen';
     document.body.appendChild(f);
   }
+  // Hass bridge: canvas iframe calls these to get/set hass entirely within
+  // this window's JS realm, avoiding WebKit cross-realm property restrictions.
+  window.__canvas_hass_bridge = {
+    getHass: function(){
+      var ha = document.querySelector('home-assistant');
+      return (ha && ha.hass) ? ha.hass : null;
+    },
+    setHass: function(el){
+      var ha = document.querySelector('home-assistant');
+      if (ha && ha.hass && el) el.hass = ha.hass;
+    }
+  };
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',setup);
   }else{
