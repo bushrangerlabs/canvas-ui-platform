@@ -90,6 +90,40 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
   const [deviceId, setDeviceId]     = useState(config.deviceId ?? '');
   const [loadedPage, setLoadedPage] = useState<LoadedPage | null>(null);
 
+  // HA ingress session for Lovelace cards in panel windows
+  const ingressRef = useRef<{ session: string; ingressPath: string; haUrl: string } | null>(null);
+
+  // Fetch HA ingress session + path so panel windows can load via HA ingress.
+  // This gives them access to HA's custom element registry (needed for Lovelace cards).
+  useEffect(() => {
+    async function fetchIngress() {
+      if (!config.haUrl || !config.haToken) return;
+      try {
+        // 1. Get this add-on's ingress path from our server
+        const infoRes = await fetch(`${config.serverUrl}/api/ingress-info`);
+        if (!infoRes.ok) return;
+        const info = await infoRes.json() as { ingress_url: string | null };
+        if (!info.ingress_url) return;
+        const ingressPath = info.ingress_url.endsWith('/') ? info.ingress_url : info.ingress_url + '/';
+
+        // 2. Create an HA ingress session using the long-lived token
+        const sessionRes = await fetch(`${config.haUrl}/api/ingress/session`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${config.haToken}` },
+        });
+        if (!sessionRes.ok) return;
+        const sessionData = await sessionRes.json() as { session: string };
+        if (!sessionData.session) return;
+
+        ingressRef.current = { session: sessionData.session, ingressPath, haUrl: config.haUrl };
+        console.log('[KioskScreen] HA ingress ready, path:', ingressPath);
+      } catch (e) {
+        console.warn('[KioskScreen] Could not get HA ingress session:', e);
+      }
+    }
+    fetchIngress();
+  }, [config.haUrl, config.haToken, config.serverUrl]);
+
   const panelLabelsRef   = useRef<string[]>([]);
   const tapTimestamps    = useRef<number[]>([]);
 
@@ -163,21 +197,45 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
 
     for (const panel of panels) {
       const label = `panel-${panel.id}`;
-      const url   = resolvePanelUrl(panel, config, deviceId);
+      const directUrl = resolvePanelUrl(panel, config, deviceId);
 
-      const win = new WebviewWindow(label, {
-        url,
-        x:      ox + pct(panel.x, sw),
-        y:      oy + pct(panel.y, sh),
-        width:  pct(panel.w, sw),
-        height: pct(panel.h, sh),
-        decorations: false,
-        resizable:   false,
-        skipTaskbar: true,
-        visible:     true,
-        title:       panel.name,
-      });
-      win.once('tauri://error', e => console.error(`[${label}] error:`, e));
+      // If a panel has a view (canvas content) and ingress is available,
+      // load via HA ingress so Lovelace card widgets can access HA frontend.
+      // External URL panels (panel.url set) always load directly.
+      const ingress = ingressRef.current;
+      const useIngress = !panel.url && ingress;
+      const url = useIngress
+        ? `${ingress.haUrl}${ingress.ingressPath}display?view=${encodeURIComponent(panel.view_id ?? '')}&device=${encodeURIComponent(deviceId)}`
+        : directUrl;
+
+      if (useIngress) {
+        // Use Rust command to inject ingress_session cookie before page load
+        invoke('create_panel_webview', {
+          label,
+          url,
+          x: ox + pct(panel.x, sw),
+          y: oy + pct(panel.y, sh),
+          width: pct(panel.w, sw),
+          height: pct(panel.h, sh),
+          title: panel.name,
+          visible: true,
+          ingressSession: ingress.session,
+        }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
+      } else {
+        const win = new WebviewWindow(label, {
+          url,
+          x:      ox + pct(panel.x, sw),
+          y:      oy + pct(panel.y, sh),
+          width:  pct(panel.w, sw),
+          height: pct(panel.h, sh),
+          decorations: false,
+          resizable:   false,
+          skipTaskbar: true,
+          visible:     true,
+          title:       panel.name,
+        });
+        win.once('tauri://error', e => console.error(`[${label}] error:`, e));
+      }
       panelLabelsRef.current.push(label);
     }
 

@@ -85,6 +85,56 @@ fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
+/// Create a panel WebviewWindow, optionally injecting an ingress_session cookie
+/// before the page loads so it passes HA ingress auth.
+/// This enables Lovelace cards to access HA's custom element registry.
+#[tauri::command]
+fn create_panel_webview(
+    app: AppHandle,
+    label: String,
+    url: String,
+    x: i32,
+    y: i32,
+    width: u32,
+    height: u32,
+    title: String,
+    visible: bool,
+    ingress_session: Option<String>,
+) -> Result<(), String> {
+    let parsed_url = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
+
+    let mut builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        &label,
+        tauri::WebviewUrl::External(parsed_url),
+    )
+    .position(x as f64, y as f64)
+    .inner_size(width as f64, height as f64)
+    .decorations(false)
+    .resizable(false)
+    .skip_taskbar(true)
+    .visible(visible)
+    .title(&title);
+
+    // Inject ingress_session cookie BEFORE any page script runs.
+    // The initialization script executes in the context of the loaded origin
+    // (ha:8123) so document.cookie sets it for that domain.
+    if let Some(session) = ingress_session {
+        // Sanitize: strip any chars that could break out of the JS string
+        let safe_session: String = session.chars()
+            .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
+            .collect();
+        let script = format!(
+            r#"document.cookie = "ingress_session={}; path=/; max-age=3600";"#,
+            safe_session
+        );
+        builder = builder.initialization_script(&script);
+    }
+
+    builder.build().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
@@ -98,6 +148,7 @@ pub fn run() {
             app_version,
             navigate_webview,
             close_webview,
+            create_panel_webview,
         ])
         .setup(|app| {
             // Disable screen saver and DPMS on launch for kiosk mode
