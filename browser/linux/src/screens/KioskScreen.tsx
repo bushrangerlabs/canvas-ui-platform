@@ -65,18 +65,20 @@ function pct(percent: number, total: number) {
 }
 /**
  * Builds the initialization_script that:
- * 1. Stores the HA long-lived token in localStorage so HA's frontend auto-logs in.
- * 2. On DOMContentLoaded, hides HA's chrome and injects a full-screen iframe
- *    pointing to the canvas display view via HA ingress (same origin as the parent
- *    HA frontend window → window.parent.customElements.get('ha-card') works).
+ * 1. Stores the HA long-lived token in localStorage so HA auto-logs in.
+ * 2. Installs __canvas_hass_bridge on the parent window so the canvas iframe
+ *    can set .hass on Lovelace card elements entirely within the parent realm
+ *    (avoids WebKit cross-realm property restrictions).
+ *    When the parent is ha:8123/canvas-ui-platform the companion panel element
+ *    calls window.hass = hass directly, so the bridge has hass immediately.
+ * 3. On DOMContentLoaded, hides HA chrome and injects a full-screen iframe
+ *    pointing to the canvas display view via HA ingress.
  */
 function buildHAKioskScript(params: {
   haUrl: string;
   haToken: string;
   iframeSrc: string;
 }): string {
-  // Long-lived tokens don't expire — fake an expiry far in the future so HA's
-  // frontend auth module won't try to refresh (which requires a refresh_token).
   const hassTokens = JSON.stringify({
     access_token:  params.haToken,
     token_type:    'Bearer',
@@ -91,6 +93,20 @@ function buildHAKioskScript(params: {
 
   return `(function(){
   try{ localStorage.setItem('hassTokens', ${tokensJson}); }catch(e){}
+  // Hass bridge: runs in HA parent window's realm. The companion panel element
+  // sets window.hass directly via its set hass() setter, so getHass() works
+  // immediately without needing to query the home-assistant custom element.
+  window.__canvas_hass_bridge = {
+    getHass: function(){ return window.hass || null; },
+    setHass: function(el){
+      var h = window.hass;
+      if(!h){
+        var ha = document.querySelector('home-assistant');
+        h = ha && ha.hass ? ha.hass : null;
+      }
+      if(h && el) el.hass = h;
+    }
+  };
   function setup(){
     var s=document.createElement('style');
     s.textContent='ha-sidebar,ha-drawer,app-header,app-toolbar,.header,[slot="toolbar"],ha-menu-button,paper-icon-button{display:none!important}body,html{margin:0;padding:0;overflow:hidden;width:100%;height:100%}';
@@ -101,18 +117,6 @@ function buildHAKioskScript(params: {
     f.allow='autoplay; fullscreen';
     document.body.appendChild(f);
   }
-  // Hass bridge: canvas iframe calls these to get/set hass entirely within
-  // this window's JS realm, avoiding WebKit cross-realm property restrictions.
-  window.__canvas_hass_bridge = {
-    getHass: function(){
-      var ha = document.querySelector('home-assistant');
-      return (ha && ha.hass) ? ha.hass : null;
-    },
-    setHass: function(el){
-      var ha = document.querySelector('home-assistant');
-      if (ha && ha.hass && el) el.hass = ha.hass;
-    }
-  };
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded',setup);
   }else{
@@ -288,7 +292,10 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
 
       if (useIngress) {
         const iframeSrc = `${ingress!.haUrl}${ingress!.ingressPath}display?view=${encodeURIComponent(panel.view_id ?? '')}&device=${encodeURIComponent(deviceId)}`;
-        const haFrontendUrl = `${ingress!.haUrl}/lovelace`;
+        // Use the companion panel URL as the parent window.
+        // The canvas-ui-platform-panel element sets window.hass directly, so
+        // the hass bridge has it available without waiting for home-assistant.
+        const haFrontendUrl = `${ingress!.haUrl}/canvas-ui-platform`;
         const initScript = buildHAKioskScript({
           haUrl:     ingress!.haUrl,
           haToken:   config.haToken!,
