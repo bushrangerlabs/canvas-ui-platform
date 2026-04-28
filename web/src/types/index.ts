@@ -185,8 +185,8 @@ export interface FloatingConfig {
 export interface Page {
   id: string;
   name: string;
-  /** The canvas-ui-hacs view slug this page points to */
-  canvas_view_id?: string | null;
+  panels: PagePanel[];
+  floating_config?: FloatingConfig | null;
   created_at: string;
   updated_at: string;
 }

@@ -124,32 +124,22 @@ function handleMessage(ws: WebSocket, msg: any): void {
         } catch { /* non-critical */ }
       }
 
-      // For browser clients, push their assigned view and/or page immediately
+      // For browser clients, push their assigned page immediately
       if (client.clientType === 'browser' && client.deviceId) {
         try {
           const db = getDb();
-          const device = db.prepare('SELECT default_view_id, default_page_id FROM devices WHERE id = ?').get(client.deviceId) as any;
+          const device = db.prepare('SELECT assigned_page_id FROM devices WHERE id = ?').get(client.deviceId) as any;
 
-          // Push assigned view
-          if (device?.default_view_id) {
-            const row = db.prepare('SELECT * FROM views WHERE id = ?').get(device.default_view_id) as any;
-            if (row) {
-              const viewData = { ...row, widgets: JSON.parse(row.widgets ?? '[]'), tags: JSON.parse(row.tags ?? '[]') };
-              send(ws, { type: 'view_change', viewId: row.id, viewData });
-            }
-          }
-
-          // Push assigned page (takes precedence for panel-based layout)
-          if (device?.default_page_id) {
-            const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(device.default_page_id) as any;
+          if (device?.assigned_page_id) {
+            const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(device.assigned_page_id) as any;
             if (page) {
-              const panels = db.prepare('SELECT * FROM page_panels WHERE page_id=? ORDER BY position').all(device.default_page_id);
+              const panels = db.prepare('SELECT * FROM page_panels WHERE page_id=? ORDER BY position, id').all(device.assigned_page_id);
               const pageData = { ...page, floating_config: page.floating_config ? JSON.parse(page.floating_config) : null, panels };
-              send(ws, { type: 'load_page', page_id: device.default_page_id, page_data: pageData });
+              send(ws, { type: 'load_page', page_id: device.assigned_page_id, page_data: pageData });
             }
           }
         } catch (err) {
-          console.warn('[ws] Failed to push initial view/page:', err);
+          console.warn('[ws] Failed to push initial page:', err);
         }
       }
       break;

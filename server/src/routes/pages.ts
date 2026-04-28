@@ -3,41 +3,84 @@ import { nanoid } from 'nanoid';
 import { getDb } from '../db/index';
 import { sendCommand } from '../ws/index';
 
+// ─── Helper ───────────────────────────────────────────────────────────────────
+
+function getPageWithPanels(db: ReturnType<typeof getDb>, id: string) {
+  const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(id) as any;
+  if (!page) return null;
+  const panels = db
+    .prepare('SELECT * FROM page_panels WHERE page_id = ? ORDER BY position, id')
+    .all(id);
+  return {
+    ...page,
+    floating_config: page.floating_config ? JSON.parse(page.floating_config) : null,
+    panels,
+  };
+}
+
 /**
- * Pages — named display slots, each pointing to a canvas-ui-hacs view.
+ * Pages — named display layouts, each with one or more panels (webviews).
  *
- * A device is assigned a page. The kiosk loads:
- *   http://<ha_host>/canvas-kiosk#<canvas_view_id>
+ * Each panel occupies a region of the screen (x/y/w/h as % 0-100) and
+ * points to either a canvas-ui-hacs view (canvas_view_id) or a raw URL.
+ *
+ * On push the kiosk receives:
+ *   { type: 'load_page', page_id, page_data: { panels, ... } }
+ * and opens one native WebviewWindow per panel.
  */
 export async function pageRoutes(app: FastifyInstance) {
 
-  // GET /api/pages
+  // GET /api/pages  — list all pages with their panels
   app.get('/pages', async () => {
-    return getDb().prepare('SELECT * FROM pages ORDER BY name').all();
+    const db = getDb();
+    const pages = db.prepare('SELECT * FROM pages ORDER BY name').all() as any[];
+    return pages.map(p => ({
+      ...p,
+      floating_config: p.floating_config ? JSON.parse(p.floating_config) : null,
+      panels: db.prepare('SELECT * FROM page_panels WHERE page_id = ? ORDER BY position, id').all(p.id),
+    }));
   });
 
-  // GET /api/pages/:id
+  // GET /api/pages/:id  — single page with panels
   app.get<{ Params: { id: string } }>('/pages/:id', async (req, reply) => {
-    const page = getDb().prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id);
+    const page = getPageWithPanels(getDb(), req.params.id);
     if (!page) return reply.code(404).send({ error: 'Page not found' });
     return page;
   });
 
-  // POST /api/pages  { name, canvas_view_id }
+  // POST /api/pages  { name, panels?: [...] }
   app.post<{ Body: any }>('/pages', async (req, reply) => {
     const db = getDb();
-    const { name = 'New Page', canvas_view_id = null } = req.body as any;
+    const { name = 'New Page', panels = [] } = req.body as any;
     const id = nanoid(10);
     const now = new Date().toISOString();
-    db.prepare(`
-      INSERT INTO pages (id, name, canvas_view_id, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?)
-    `).run(id, name, canvas_view_id, now, now);
+
+    db.transaction(() => {
+      db.prepare(`
+        INSERT INTO pages (id, name, created_at, updated_at)
+        VALUES (?, ?, ?, ?)
+      `).run(id, name, now, now);
+
+      for (let i = 0; i < panels.length; i++) {
+        const p = panels[i];
+        db.prepare(`
+          INSERT INTO page_panels (id, page_id, name, x, y, w, h, view_id, url, position)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `).run(
+          nanoid(10), id,
+          p.name ?? `Panel ${i + 1}`,
+          p.x ?? 0, p.y ?? 0, p.w ?? 100, p.h ?? 100,
+          p.view_id ?? null, p.url ?? null,
+          p.position ?? i,
+        );
+      }
+    })();
+
     reply.code(201);
-    return db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
+    return getPageWithPanels(db, id);
   });
 
-  // PATCH /api/pages/:id  { name?, canvas_view_id? }
+  // PATCH /api/pages/:id  { name? }
   app.patch<{ Params: { id: string }; Body: any }>('/pages/:id', async (req, reply) => {
     const db = getDb();
     const { id } = req.params;
@@ -46,7 +89,7 @@ export async function pageRoutes(app: FastifyInstance) {
 
     const fields: string[] = [];
     const vals: any[] = [];
-    for (const f of ['name', 'canvas_view_id']) {
+    for (const f of ['name']) {
       if ((req.body as any)[f] !== undefined) {
         fields.push(`${f}=?`);
         vals.push((req.body as any)[f]);
@@ -57,7 +100,7 @@ export async function pageRoutes(app: FastifyInstance) {
       vals.push(new Date().toISOString(), id);
       db.prepare(`UPDATE pages SET ${fields.join(', ')} WHERE id=?`).run(...vals);
     }
-    return db.prepare('SELECT * FROM pages WHERE id = ?').get(id);
+    return getPageWithPanels(db, id);
   });
 
   // DELETE /api/pages/:id
@@ -70,19 +113,80 @@ export async function pageRoutes(app: FastifyInstance) {
     return { success: true };
   });
 
-  // POST /api/pages/:id/push  — tell all assigned devices to reload
+  // POST /api/pages/:id/push  — push load_page to all assigned devices
   app.post<{ Params: { id: string } }>('/pages/:id/push', async (req, reply) => {
     const db = getDb();
-    const page = db.prepare('SELECT * FROM pages WHERE id = ?').get(req.params.id) as any;
+    const page = getPageWithPanels(db, req.params.id);
     if (!page) return reply.code(404).send({ error: 'Page not found' });
 
     const devices = db.prepare('SELECT id FROM devices WHERE assigned_page_id=?').all(page.id) as any[];
     for (const dev of devices) {
-      sendCommand(dev.id, {
-        type: 'load_view',
-        canvas_view_id: page.canvas_view_id,
-      });
+      sendCommand(dev.id, { type: 'load_page', page_id: page.id, page_data: page });
     }
     return { pushed_to: devices.length };
   });
+
+  // ── Panel sub-routes ──────────────────────────────────────────────────────
+
+  // POST /api/pages/:id/panels  { name, x, y, w, h, canvas_view_id?, url? }
+  app.post<{ Params: { id: string }; Body: any }>('/pages/:id/panels', async (req, reply) => {
+    const db = getDb();
+    if (!db.prepare('SELECT id FROM pages WHERE id = ?').get(req.params.id))
+      return reply.code(404).send({ error: 'Page not found' });
+
+    const b = req.body as any;
+    const panelId = nanoid(10);
+    const maxPos = (db.prepare(
+      'SELECT COALESCE(MAX(position), -1) as m FROM page_panels WHERE page_id=?'
+    ).get(req.params.id) as any).m;
+
+    db.prepare(`
+      INSERT INTO page_panels (id, page_id, name, x, y, w, h, view_id, url, position)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      panelId, req.params.id,
+      b.name ?? 'New Panel',
+      b.x ?? 0, b.y ?? 0, b.w ?? 100, b.h ?? 100,
+      b.view_id ?? null, b.url ?? null,
+      maxPos + 1,
+    );
+    db.prepare('UPDATE pages SET updated_at=? WHERE id=?').run(new Date().toISOString(), req.params.id);
+
+    reply.code(201);
+    return db.prepare('SELECT * FROM page_panels WHERE id = ?').get(panelId);
+  });
+
+  // PATCH /api/pages/:id/panels/:panelId
+  app.patch<{ Params: { id: string; panelId: string }; Body: any }>(
+    '/pages/:id/panels/:panelId', async (req, reply) => {
+      const db = getDb();
+      if (!db.prepare('SELECT id FROM page_panels WHERE id=? AND page_id=?').get(req.params.panelId, req.params.id))
+        return reply.code(404).send({ error: 'Panel not found' });
+
+      const b = req.body as any;
+      const fields: string[] = [];
+      const vals: any[] = [];
+      for (const f of ['name', 'x', 'y', 'w', 'h', 'view_id', 'url', 'position']) {
+        if (b[f] !== undefined) { fields.push(`${f}=?`); vals.push(b[f]); }
+      }
+      if (fields.length) {
+        vals.push(req.params.panelId);
+        db.prepare(`UPDATE page_panels SET ${fields.join(', ')} WHERE id=?`).run(...vals);
+        db.prepare('UPDATE pages SET updated_at=? WHERE id=?').run(new Date().toISOString(), req.params.id);
+      }
+      return db.prepare('SELECT * FROM page_panels WHERE id = ?').get(req.params.panelId);
+    }
+  );
+
+  // DELETE /api/pages/:id/panels/:panelId
+  app.delete<{ Params: { id: string; panelId: string } }>(
+    '/pages/:id/panels/:panelId', async (req, reply) => {
+      const db = getDb();
+      if (!db.prepare('SELECT id FROM page_panels WHERE id=? AND page_id=?').get(req.params.panelId, req.params.id))
+        return reply.code(404).send({ error: 'Panel not found' });
+      db.prepare('DELETE FROM page_panels WHERE id = ?').run(req.params.panelId);
+      db.prepare('UPDATE pages SET updated_at=? WHERE id=?').run(new Date().toISOString(), req.params.id);
+      return { success: true };
+    }
+  );
 }

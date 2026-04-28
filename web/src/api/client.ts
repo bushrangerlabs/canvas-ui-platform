@@ -75,10 +75,12 @@ export const devicesApi = {
 
 // ── Pages ──────────────────────────────────────────────────────────────────────
 
-import type { Page } from '../types';
+import type { Page, PagePanel } from '../types';
 
-export type PageCreate = { name: string; canvas_view_id?: string | null };
-export type PageUpdate = Partial<PageCreate>;
+export type PageCreate = { name: string };
+export type PageUpdate = { name?: string };
+export type PanelCreate = { name?: string; x?: number; y?: number; w?: number; h?: number; view_id?: string | null; url?: string | null };
+export type PanelUpdate = Partial<PanelCreate & { position?: number }>;
 
 export const pagesApi = {
   list: () => api.get<Page[]>('/api/pages'),
@@ -87,6 +89,13 @@ export const pagesApi = {
   update: (id: string, data: PageUpdate) => api.patch<Page>(`/api/pages/${id}`, data),
   delete: (id: string) => api.delete<void>(`/api/pages/${id}`),
   push: (id: string) => api.post<{ pushed_to: number }>(`/api/pages/${id}/push`),
+  // Panel CRUD
+  addPanel: (pageId: string, data: PanelCreate) =>
+    api.post<PagePanel>(`/api/pages/${pageId}/panels`, data),
+  updatePanel: (pageId: string, panelId: string, data: PanelUpdate) =>
+    api.patch<PagePanel>(`/api/pages/${pageId}/panels/${panelId}`, data),
+  deletePanel: (pageId: string, panelId: string) =>
+    api.delete<void>(`/api/pages/${pageId}/panels/${panelId}`),
 };
 
 // ── Server ────────────────────────────────────────────────────────────────────

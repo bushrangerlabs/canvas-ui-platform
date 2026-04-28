@@ -133,10 +133,11 @@ async function closeAllPanelWindows() {
   );
 }
 
-function resolvePanelUrl(panel: PagePanel, config: AppConfig, deviceId: string): string {
+function resolvePanelUrl(panel: PagePanel, config: AppConfig, _deviceId: string): string {
   if (panel.url) return panel.url;
-  if (panel.view_id) return `${config.serverUrl}/display?view=${encodeURIComponent(panel.view_id)}`;
-  return `${config.serverUrl}/display?device=${encodeURIComponent(deviceId)}`;
+  // view_id is a canvas-ui-hacs view slug — load via the kiosk panel
+  if (panel.view_id) return `${config.haUrl}/canvas-kiosk#${encodeURIComponent(panel.view_id)}`;
+  return `${config.haUrl}/canvas-kiosk`;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
