@@ -316,37 +316,36 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
           initScript,
         }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
       } else {
-        const win = new WebviewWindow(label, {
-          url: directUrl,
-          x:      ox + pct(panel.x, sw),
-          y:      oy + pct(panel.y, sh),
-          width:  pct(panel.w, sw),
-          height: pct(panel.h, sh),
-          decorations: false,
-          resizable:   false,
-          skipTaskbar: true,
-          visible:     true,
-          title:       panel.name,
-        });
-        win.once('tauri://error', e => console.error(`[${label}] error:`, e));
+        invoke('create_panel_webview', {
+          label,
+          url:           directUrl,
+          x:             ox + pct(panel.x, sw),
+          y:             oy + pct(panel.y, sh),
+          width:         pct(panel.w, sw),
+          height:        pct(panel.h, sh),
+          title:         panel.name,
+          visible:       true,
+          ingressSession: null,
+          initScript:    null,
+        }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
       }
       panelLabelsRef.current.push(label);
     }
 
     if (floating?.url) {
       const fc = floating;
-      const fl = new WebviewWindow('floating', {
-        url:    fc.url!,
-        x:      ox + pct(fc.x ?? 10, sw),
-        y:      oy + pct(fc.y ?? 10, sh),
-        width:  pct(fc.w ?? 80, sw),
-        height: pct(fc.h ?? 80, sh),
-        decorations: false,
-        resizable:   false,
-        skipTaskbar: true,
-        visible:     false,
-      });
-      fl.once('tauri://error', e => console.error('[floating] error:', e));
+      invoke('create_panel_webview', {
+        label:         'floating',
+        url:           fc.url!,
+        x:             ox + pct(fc.x ?? 10, sw),
+        y:             oy + pct(fc.y ?? 10, sh),
+        width:         pct(fc.w ?? 80, sw),
+        height:        pct(fc.h ?? 80, sh),
+        title:         'Floating',
+        visible:       false,
+        ingressSession: null,
+        initScript:    null,
+      }).catch(e => console.error('[floating] create_panel_webview error:', e));
     }
   }, [config, deviceId]);
 
@@ -368,14 +367,18 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         } else {
           const sw = window.screen.width;
           const sh = window.screen.height;
-          const win = new WebviewWindow(label, {
+          await invoke('create_panel_webview', {
+            label,
             url,
-            x: window.screenX ?? 0,
-            y: window.screenY ?? 0,
-            width: sw, height: sh,
-            decorations: false, resizable: false, skipTaskbar: true, visible: true,
-          });
-          win.once('tauri://error', e => console.error('[load_view] error:', e));
+            x:             window.screenX ?? 0,
+            y:             window.screenY ?? 0,
+            width:         sw,
+            height:        sh,
+            title:         'Canvas UI',
+            visible:       true,
+            ingressSession: null,
+            initScript:    null,
+          }).catch(e => console.error('[load_view] create_panel_webview error:', e));
           panelLabelsRef.current = [label];
         }
         break;
@@ -413,15 +416,18 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
           const sh = window.screen.height;
           const ox = window.screenX ?? 0;
           const oy = window.screenY ?? 0;
-          const fl = new WebviewWindow('floating', {
+          await invoke('create_panel_webview', {
+            label:         'floating',
             url,
-            x:      ox + pct(fc?.x ?? 10, sw),
-            y:      oy + pct(fc?.y ?? 10, sh),
-            width:  pct(fc?.w ?? 80, sw),
-            height: pct(fc?.h ?? 80, sh),
-            decorations: false, resizable: false, skipTaskbar: true, visible: true,
-          });
-          fl.once('tauri://error', e => console.error('[floating] error:', e));
+            x:             ox + pct(fc?.x ?? 10, sw),
+            y:             oy + pct(fc?.y ?? 10, sh),
+            width:         pct(fc?.w ?? 80, sw),
+            height:        pct(fc?.h ?? 80, sh),
+            title:         'Floating',
+            visible:       true,
+            ingressSession: null,
+            initScript:    null,
+          }).catch(e => console.error('[floating] create_panel_webview error:', e));
           return;
         }
         WebviewWindow.getByLabel('floating').then(w => w?.show().catch(() => {}));
@@ -466,14 +472,18 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       if (existing) return;
       const sw = window.screen.width;
       const sh = window.screen.height;
-      const fallback = new WebviewWindow(label, {
-        url: `${config.haUrl}/canvas-kiosk`,
-        x: window.screenX ?? 0,
-        y: window.screenY ?? 0,
-        width: sw, height: sh,
-        decorations: false, resizable: false, skipTaskbar: true, visible: true,
-      });
-      fallback.once('tauri://error', e => console.error('[fallback] error:', e));
+      invoke('create_panel_webview', {
+        label,
+        url:           `${config.haUrl}/canvas-kiosk`,
+        x:             window.screenX ?? 0,
+        y:             window.screenY ?? 0,
+        width:         sw,
+        height:        sh,
+        title:         'Canvas UI',
+        visible:       true,
+        ingressSession: null,
+        initScript:    null,
+      }).catch(e => console.error('[fallback] create_panel_webview error:', e));
       panelLabelsRef.current = [label];
     });
   }, [appState, deviceId, loadedPage, config.serverUrl]);
