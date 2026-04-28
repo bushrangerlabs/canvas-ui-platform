@@ -1,22 +1,14 @@
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import jwt from '@fastify/jwt';
-import multipart from '@fastify/multipart';
 import staticFiles from '@fastify/static';
 import path from 'path';
 import { config } from './config';
 import { initDb } from './db/index';
-import { initWss, startHAStatePoller } from './ws/index';
-import { viewRoutes } from './routes/views';
+import { initWss } from './ws/index';
 import { deviceRoutes } from './routes/devices';
-import { dataSourceRoutes } from './routes/datasources';
-import { imageRoutes } from './routes/images';
-import { serverRoutes } from './routes/server';
 import { haRoutes } from './routes/ha';
-import { scheduleRoutes } from './routes/schedules';
-import { aiRoutes } from './routes/ai';
 import { pageRoutes } from './routes/pages';
-import { proxyRoutes } from './routes/proxy';
 
 async function main() {
   // ── Database ──────────────────────────────────────────────────────────────
@@ -30,19 +22,11 @@ async function main() {
 
   await app.register(cors, { origin: config.corsOrigins });
   await app.register(jwt, { secret: config.jwtSecret });
-  await app.register(multipart, { limits: { fileSize: 50 * 1024 * 1024 } }); // 50 MB
 
   // ── Routes ────────────────────────────────────────────────────────────────
-  await app.register(viewRoutes,       { prefix: '/api' });
-  await app.register(deviceRoutes,     { prefix: '/api' });
-  await app.register(dataSourceRoutes, { prefix: '/api' });
-  await app.register(imageRoutes,      { prefix: '/api' });
-  await app.register(serverRoutes,     { prefix: '/api' });
-  await app.register(haRoutes,         { prefix: '/api' });
-  await app.register(scheduleRoutes,   { prefix: '/api' });
-  await app.register(aiRoutes,         { prefix: '/api/ai' });
-  await app.register(pageRoutes,       { prefix: '/api' });
-  await app.register(proxyRoutes,      { prefix: '' });
+  await app.register(deviceRoutes, { prefix: '/api' });
+  await app.register(haRoutes,     { prefix: '/api' });
+  await app.register(pageRoutes,   { prefix: '/api' });
 
   // ── Serve web SPA (editor + display) ─────────────────────────────────────
   const webRoot = path.join(__dirname, '..', 'public');
@@ -75,7 +59,6 @@ async function main() {
   // ── HTTP server + WebSocket ───────────────────────────────────────────────
   await app.ready();
   initWss(app.server);
-  startHAStatePoller();
 
   // ── Start ─────────────────────────────────────────────────────────────────
   try {

@@ -75,17 +75,16 @@ export const devicesApi = {
 
 // ── Pages ──────────────────────────────────────────────────────────────────────
 
-import type { Page, PagePanel } from '../types';
+import type { Page } from '../types';
 
-export type PageCreate = { name: string; swipe_left_page_id?: string; swipe_right_page_id?: string; panels?: Partial<PagePanel>[] };
-export type PageUpdate = Partial<PageCreate> & { floating_config?: Page['floating_config'] };
+export type PageCreate = { name: string; canvas_view_id?: string | null };
+export type PageUpdate = Partial<PageCreate>;
 
 export const pagesApi = {
   list: () => api.get<Page[]>('/api/pages'),
   get: (id: string) => api.get<Page>(`/api/pages/${id}`),
   create: (data: PageCreate) => api.post<Page>('/api/pages', data),
   update: (id: string, data: PageUpdate) => api.patch<Page>(`/api/pages/${id}`, data),
-  updatePanels: (id: string, panels: Partial<PagePanel>[]) => api.put<Page>(`/api/pages/${id}/panels`, panels),
   delete: (id: string) => api.delete<void>(`/api/pages/${id}`),
   push: (id: string) => api.post<{ pushed_to: number }>(`/api/pages/${id}/push`),
 };

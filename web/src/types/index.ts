@@ -128,13 +128,8 @@ export interface Device {
   description?: string;
   platform?: string;
   slug?: string;
-  /** The view pinned/assigned to this device — shown when no schedule is active */
-  default_view_id?: string;
-  /** The page assigned to this device (new pages system) */
-  default_page_id?: string;
-  /** The live view currently being displayed (may differ from default if schedule is running) */
-  current_view_id?: string;
-  schedule_id?: string;
+  /** The page currently assigned to this device */
+  assigned_page_id?: string | null;
   ip_address?: string;
   app_version?: string;
   screen_width?: number;
@@ -190,10 +185,8 @@ export interface FloatingConfig {
 export interface Page {
   id: string;
   name: string;
-  swipe_left_page_id?: string;
-  swipe_right_page_id?: string;
-  floating_config?: FloatingConfig | null;
-  panels: PagePanel[];
+  /** The canvas-ui-hacs view slug this page points to */
+  canvas_view_id?: string | null;
   created_at: string;
   updated_at: string;
 }

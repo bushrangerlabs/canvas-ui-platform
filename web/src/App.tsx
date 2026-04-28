@@ -1,11 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider, createTheme, CssBaseline } from '@mui/material';
-import { HAEntitiesProvider } from './context/HAEntitiesContext';
-import { DataSourceValuesProvider } from './context/DataSourceValuesContext';
-import EditorPage from './pages/EditorPage';
-import DisplayPage from './pages/DisplayPage';
 import DevicesPage from './pages/DevicesPage';
-import SchedulesPage from './pages/SchedulesPage';
 import SettingsPage from './pages/SettingsPage';
 import PagesPage from './pages/PagesPage';
 
@@ -35,21 +30,14 @@ export default function App() {
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
-      <HAEntitiesProvider>
-        <DataSourceValuesProvider>
-        <BrowserRouter basename={getBasename()}>
-          <Routes>
-            <Route path="/" element={<Navigate to="/editor" replace />} />
-            <Route path="/editor/*" element={<EditorPage />} />
-            <Route path="/display" element={<DisplayPage />} />
-            <Route path="/devices" element={<DevicesPage />} />
-            <Route path="/schedules" element={<SchedulesPage />} />
-            <Route path="/pages" element={<PagesPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-          </Routes>
-        </BrowserRouter>
-        </DataSourceValuesProvider>
-      </HAEntitiesProvider>
+      <BrowserRouter basename={getBasename()}>
+        <Routes>
+          <Route path="/" element={<Navigate to="/devices" replace />} />
+          <Route path="/devices" element={<DevicesPage />} />
+          <Route path="/pages" element={<PagesPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+        </Routes>
+      </BrowserRouter>
     </ThemeProvider>
   );
 }

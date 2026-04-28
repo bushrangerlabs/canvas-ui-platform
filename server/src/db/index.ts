@@ -206,4 +206,20 @@ const migrations: Array<{
       `);
     },
   },
+  {
+    version: 4,
+    name: 'simplify pages to canvas-ui-hacs view references',
+    up: (db) => {
+      db.exec(`
+        -- Pages now just map a name to a canvas-ui-hacs view id/slug
+        ALTER TABLE pages ADD COLUMN canvas_view_id TEXT;
+
+        -- Devices use assigned_page_id as the canonical assignment field
+        ALTER TABLE devices ADD COLUMN assigned_page_id TEXT REFERENCES pages(id) ON DELETE SET NULL;
+
+        -- Migrate any existing default_page_id → assigned_page_id
+        UPDATE devices SET assigned_page_id = default_page_id WHERE default_page_id IS NOT NULL;
+      `);
+    },
+  },
 ];
