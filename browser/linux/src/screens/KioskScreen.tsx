@@ -74,6 +74,21 @@ function pct(percent: number, total: number) {
  * 3. On DOMContentLoaded, hides HA chrome and injects a full-screen iframe
  *    pointing to the canvas display view via HA ingress.
  */
+/** Minimal init script: just set hassTokens so HA auto-logs in. */
+function buildHAAuthScript(haUrl: string, haToken: string): string {
+  const hassTokens = JSON.stringify({
+    access_token:  haToken,
+    token_type:    'Bearer',
+    expires_in:    99999999,
+    hassUrl:       haUrl,
+    clientId:      `${haUrl}/`,
+    expires:       new Date('2099-01-01').getTime(),
+    refresh_token: '',
+  });
+  const tokensJson = JSON.stringify(hassTokens);
+  return `(function(){ try{ localStorage.setItem('hassTokens', ${tokensJson}); }catch(e){} })();`;
+}
+
 function buildHAKioskScript(params: {
   haUrl: string;
   haToken: string;
@@ -326,7 +341,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
           title:         panel.name,
           visible:       true,
           ingressSession: null,
-          initScript:    null,
+          initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
         }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
       }
       panelLabelsRef.current.push(label);
@@ -344,7 +359,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         title:         'Floating',
         visible:       false,
         ingressSession: null,
-        initScript:    null,
+        initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
       }).catch(e => console.error('[floating] create_panel_webview error:', e));
     }
   }, [config, deviceId]);
@@ -377,7 +392,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
             title:         'Canvas UI',
             visible:       true,
             ingressSession: null,
-            initScript:    null,
+            initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
           }).catch(e => console.error('[load_view] create_panel_webview error:', e));
           panelLabelsRef.current = [label];
         }
@@ -426,7 +441,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
             title:         'Floating',
             visible:       true,
             ingressSession: null,
-            initScript:    null,
+            initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
           }).catch(e => console.error('[floating] create_panel_webview error:', e));
           return;
         }
@@ -482,7 +497,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         title:         'Canvas UI',
         visible:       true,
         ingressSession: null,
-        initScript:    null,
+        initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
       }).catch(e => console.error('[fallback] create_panel_webview error:', e));
       panelLabelsRef.current = [label];
     });
