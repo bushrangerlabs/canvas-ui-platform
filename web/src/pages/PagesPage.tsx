@@ -146,17 +146,17 @@ function PanelDialog({ open, initial, onClose, onSave }: PanelDialogProps) {
           <Divider><Typography variant="caption" color="text.secondary">Position (% of screen)</Typography></Divider>
           <Stack direction="row" spacing={1}>
             <TextField label="X" type="number" value={x} onChange={e => setX(Number(e.target.value))}
-              inputProps={{ min: 0, max: 100 }} size="small"
-              InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
+              size="small"
+              slotProps={{ htmlInput: { min: 0, max: 100 }, input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }} />
             <TextField label="Y" type="number" value={y} onChange={e => setY(Number(e.target.value))}
-              inputProps={{ min: 0, max: 100 }} size="small"
-              InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
+              size="small"
+              slotProps={{ htmlInput: { min: 0, max: 100 }, input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }} />
             <TextField label="W" type="number" value={w} onChange={e => setW(Number(e.target.value))}
-              inputProps={{ min: 1, max: 100 }} size="small"
-              InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
+              size="small"
+              slotProps={{ htmlInput: { min: 1, max: 100 }, input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }} />
             <TextField label="H" type="number" value={h} onChange={e => setH(Number(e.target.value))}
-              inputProps={{ min: 1, max: 100 }} size="small"
-              InputProps={{ endAdornment: <InputAdornment position="end">%</InputAdornment> }} />
+              size="small"
+              slotProps={{ htmlInput: { min: 1, max: 100 }, input: { endAdornment: <InputAdornment position="end">%</InputAdornment> } }} />
           </Stack>
         </Stack>
       </DialogContent>
@@ -344,7 +344,7 @@ export default function PagesPage() {
                 <ListItemText
                   primary={page.name}
                   secondary={
-                    <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.25 }}>
+                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.25, flexWrap: 'wrap' }}>
                       <Chip
                         icon={<WebAssetIcon sx={{ fontSize: '10px !important' }} />}
                         label={`${page.panels?.length ?? 0} panel${page.panels?.length === 1 ? '' : 's'}`}
@@ -376,7 +376,7 @@ export default function PagesPage() {
             <Stack spacing={3} sx={{ maxWidth: 720 }}>
 
               {/* Name */}
-              <Stack direction="row" spacing={2} alignItems="flex-end">
+              <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-end' }}>
                 <TextField
                   label="Page Name"
                   value={editName}
@@ -409,7 +409,7 @@ export default function PagesPage() {
 
               {/* Panels */}
               <Box>
-                <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+                <Stack direction="row" sx={{ justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
                   <Typography variant="subtitle2">
                     Panels ({selectedPage.panels?.length ?? 0})
                   </Typography>
@@ -436,7 +436,7 @@ export default function PagesPage() {
                       {(selectedPage.panels ?? []).map((panel, i) => (
                         <TableRow key={panel.id} hover>
                           <TableCell>
-                            <Stack direction="row" spacing={1} alignItems="center">
+                            <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
                               <Box sx={{
                                 width: 10, height: 10, borderRadius: '2px', flexShrink: 0,
                                 bgcolor: PANEL_COLORS[i % PANEL_COLORS.length],
