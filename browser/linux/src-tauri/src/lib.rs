@@ -60,23 +60,34 @@ async fn keep_screen_on(app: AppHandle) -> Result<(), String> {
 }
 
 /// Navigate an existing WebviewWindow to a new URL.
-/// Used by KioskScreen to implement navigate_panel without closing/reopening.
+/// Must run on the GTK main thread on Linux — same restriction as build().
 #[tauri::command]
-async fn navigate_webview(app: AppHandle, label: String, url: String) -> Result<(), String> {
-    let win = app.get_webview_window(&label)
-        .ok_or_else(|| format!("No webview with label '{}'", label))?;
+fn navigate_webview(app: AppHandle, label: String, url: String) -> Result<(), String> {
     let parsed = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
-    win.navigate(parsed).map_err(|e| e.to_string())
+    let app_handle = app.clone();
+    app.run_on_main_thread(move || {
+        if let Some(win) = app_handle.get_webview_window(&label) {
+            if let Err(e) = win.navigate(parsed) {
+                eprintln!("[navigate_webview] failed '{}': {}", label, e);
+            }
+        } else {
+            eprintln!("[navigate_webview] no webview '{}'", label);
+        }
+    }).map_err(|e| e.to_string())
 }
 
 /// Close a WebviewWindow by label.
+/// Must run on the GTK main thread on Linux.
 #[tauri::command]
 fn close_webview(app: AppHandle, label: String) -> Result<(), String> {
-    if let Some(win) = app.get_webview_window(&label) {
-        win.close().map_err(|e| e.to_string())
-    } else {
-        Ok(()) // already gone
-    }
+    let app_handle = app.clone();
+    app.run_on_main_thread(move || {
+        if let Some(win) = app_handle.get_webview_window(&label) {
+            if let Err(e) = win.close() {
+                eprintln!("[close_webview] failed '{}': {}", label, e);
+            }
+        }
+    }).map_err(|e| e.to_string())
 }
 
 /// Get the app version from Cargo.toml
