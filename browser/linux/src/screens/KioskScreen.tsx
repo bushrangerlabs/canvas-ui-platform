@@ -3,15 +3,15 @@
  *
  * Architecture:
  *   • This React app (main window) is the WS controller only — black background.
- *   • Each panel in a page becomes a native OS WebviewWindow (no X-Frame-Options,
- *     no iframe sandbox restrictions, separate renderer process per panel).
- *   • load_page      → close existing panel windows, open new native ones
+ *   • load_view      → navigate (or create) a single fullscreen WebviewWindow to
+ *                       ha_host/canvas-kiosk#<canvas_view_id>
+ *   • load_page      → legacy multi-panel support (panels become native WebviewWindows)
  *   • navigate_panel → Rust command navigates window URL in-place
  *   • show/hide_floating → create / show / hide a floating WebviewWindow
  *   • screen_on/off, set_brightness → xset / xrandr via Tauri invoke
  *   • reload         → close panels + window.location.reload()
  *   • Settings overlay: hides panel windows while shown, restores after
- *   • Fallback (no page): single fullscreen panel → /display?device=<id>
+ *   • Fallback (no page assigned): single fullscreen panel → ha_host/canvas-kiosk
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -354,6 +354,32 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
     console.log('[KioskScreen] command:', cmd);
     switch (cmd.type) {
 
+      case 'load_view': {
+        // New architecture: server assigns a page with a canvas_view_id.
+        // Kiosk navigates (or creates) a single fullscreen window to
+        //   ha_host/canvas-kiosk#<canvas_view_id>
+        const canvas_view_id = cmd.canvas_view_id as string | undefined;
+        const url = `${config.haUrl}/canvas-kiosk${canvas_view_id ? '#' + canvas_view_id : ''}`;
+        const label = 'panel-fallback';
+        const existing = await WebviewWindow.getByLabel(label);
+        if (existing) {
+          await invoke('navigate_webview', { label, url }).catch(console.error);
+        } else {
+          const sw = window.screen.width;
+          const sh = window.screen.height;
+          const win = new WebviewWindow(label, {
+            url,
+            x: window.screenX ?? 0,
+            y: window.screenY ?? 0,
+            width: sw, height: sh,
+            decorations: false, resizable: false, skipTaskbar: true, visible: true,
+          });
+          win.once('tauri://error', e => console.error('[load_view] error:', e));
+          panelLabelsRef.current = [label];
+        }
+        break;
+      }
+
       case 'load_page': {
         const pageData = cmd.page_data as { panels: PagePanel[]; floating_config: FloatingConfig | null };
         const page: LoadedPage = {
@@ -440,7 +466,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       const sw = window.screen.width;
       const sh = window.screen.height;
       const fallback = new WebviewWindow(label, {
-        url: `${config.serverUrl}/display?device=${encodeURIComponent(deviceId)}`,
+        url: `${config.haUrl}/canvas-kiosk`,
         x: window.screenX ?? 0,
         y: window.screenY ?? 0,
         width: sw, height: sh,
