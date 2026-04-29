@@ -13,9 +13,10 @@ fi
 
 REPO_ROOT="$(cd "$(dirname "$0")" && pwd)"
 
-# ── 1. Bump version in config.yaml ────────────────────────────────────────────
+# ── 1. Bump version in config.yaml and tauri.conf.json ───────────────────────
 sed -i "s/^version: .*/version: \"${VERSION}\"/" "$REPO_ROOT/config.yaml"
-echo "✓ config.yaml → $VERSION"
+sed -i "s/\"version\": \".*\"/\"version\": \"${VERSION}\"/" "$REPO_ROOT/browser/linux/src-tauri/tauri.conf.json"
+echo "✓ config.yaml + tauri.conf.json → $VERSION"
 
 # ── 2. Build web ──────────────────────────────────────────────────────────────
 echo "Building web…"
