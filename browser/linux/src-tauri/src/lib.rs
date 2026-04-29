@@ -62,7 +62,7 @@ async fn keep_screen_on(app: AppHandle) -> Result<(), String> {
 /// Navigate an existing WebviewWindow to a new URL.
 /// Must run on the GTK main thread on Linux — same restriction as build().
 #[tauri::command]
-fn navigate_webview(app: AppHandle, label: String, url: String) -> Result<(), String> {
+async fn navigate_webview(app: AppHandle, label: String, url: String) -> Result<(), String> {
     let parsed = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
     let app_handle = app.clone();
     app.run_on_main_thread(move || {
@@ -79,7 +79,7 @@ fn navigate_webview(app: AppHandle, label: String, url: String) -> Result<(), St
 /// Close a WebviewWindow by label.
 /// Must run on the GTK main thread on Linux.
 #[tauri::command]
-fn close_webview(app: AppHandle, label: String) -> Result<(), String> {
+async fn close_webview(app: AppHandle, label: String) -> Result<(), String> {
     let app_handle = app.clone();
     app.run_on_main_thread(move || {
         if let Some(win) = app_handle.get_webview_window(&label) {
@@ -155,8 +155,24 @@ fn create_panel_webview(
             builder = builder.initialization_script(&script);
         }
 
-        if let Err(e) = builder.build() {
-            eprintln!("[create_panel_webview] failed to build '{}': {}", label, e);
+        match builder.build() {
+            Err(e) => {
+                eprintln!("[create_panel_webview] failed to build '{}': {}", label, e);
+            }
+            Ok(win) => {
+                // Disable GPU/hardware acceleration for panel windows on Linux.
+                // WebKitGTK GPU compositing crashes on many kiosk/embedded systems.
+                #[cfg(target_os = "linux")]
+                let _ = win.with_webview(|wv| {
+                    use webkit2gtk::{SettingsExt, WebViewExt};
+                    let wk = wv.inner();
+                    if let Some(settings) = wk.settings() {
+                        settings.set_hardware_acceleration_policy(
+                            webkit2gtk::HardwareAccelerationPolicy::Never,
+                        );
+                    }
+                });
+            }
         }
     }).map_err(|e| e.to_string())
 }
