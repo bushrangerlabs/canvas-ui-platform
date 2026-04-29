@@ -178,6 +178,20 @@ fn create_panel_webview(
 }
 
 pub fn run() {
+    // Set WebKit2GTK environment variables before anything initializes.
+    // These must be set before the GTK/WebKit process tree starts.
+    #[cfg(target_os = "linux")]
+    {
+        // Disable the WebKit network process sandbox — on many kiosk/embedded
+        // Linux systems the sandbox prevents the WebProcess from loading any
+        // resources, causing segfault + "internallyFailedLoadTimerFired" errors.
+        unsafe { std::env::set_var("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1"); }
+        // Disable GPU compositing — crashes on systems without proper DRI/DMA-buf.
+        unsafe { std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1"); }
+        // Force software rendering in the GPU process as a belt-and-suspenders.
+        unsafe { std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1"); }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
