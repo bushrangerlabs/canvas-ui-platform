@@ -192,11 +192,8 @@ pub fn run() {
         unsafe { std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1"); }
         // Disable JavaScriptCore JIT — JIT codegen crashes on some kiosk/embedded
         // Linux systems (seen as segfault deep in libjavascriptcoregtk-4.1.so.0).
-        // The interpreter is slower but stable.
+        // JSC_useLLInt forces the stable bytecode interpreter path.
         unsafe { std::env::set_var("JSC_useLLInt", "true"); }
-        unsafe { std::env::set_var("JSC_enableJIT", "false"); }
-        unsafe { std::env::set_var("JSC_enableFTL", "false"); }
-        unsafe { std::env::set_var("JSC_enableDFG", "false"); }
     }
 
     tauri::Builder::default()
