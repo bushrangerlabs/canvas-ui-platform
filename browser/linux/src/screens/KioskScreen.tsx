@@ -293,57 +293,21 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       const label = `panel-${panel.id}`;
       const directUrl = resolvePanelUrl(panel, config, deviceId);
 
-      // If a panel has a view (canvas content) and HA ingress is available,
-      // load the panel by opening HA's actual frontend (ha:8123/lovelace) in the
-      // WebviewWindow. An initialization_script:
-      //   1. Sets localStorage hassTokens for HA auto-login (using the long-lived token)
-      //   2. Sets the ingress_session cookie for the iframe's ingress request
-      //   3. On DOMContentLoaded, hides HA chrome and injects a full-screen iframe
-      //      pointing to the canvas display via HA ingress.
-      // Because both the parent (ha:8123/lovelace) and the iframe
-      // (ha:8123/api/hassio_ingress/.../display) share origin ha:8123, the iframe
-      // can access window.parent.customElements.get('ha-card') → Lovelace works.
-      const ingress = ingressRef.current;
-      const useIngress = !panel.url && ingress && config.haToken;
-
-      if (useIngress) {
-        const iframeSrc = `${ingress!.haUrl}${ingress!.ingressPath}display?view=${encodeURIComponent(panel.view_id ?? '')}&device=${encodeURIComponent(deviceId)}`;
-        // Use the companion panel URL as the parent window.
-        // The canvas-ui-platform-panel element sets window.hass directly, so
-        // the hass bridge has it available without waiting for home-assistant.
-        const haFrontendUrl = `${ingress!.haUrl}/canvas-ui-platform`;
-        const initScript = buildHAKioskScript({
-          haUrl:     ingress!.haUrl,
-          haToken:   config.haToken!,
-          iframeSrc,
-        });
-
-        invoke('create_panel_webview', {
-          label,
-          url:           haFrontendUrl,
-          x:             ox + pct(panel.x, sw),
-          y:             oy + pct(panel.y, sh),
-          width:         pct(panel.w, sw),
-          height:        pct(panel.h, sh),
-          title:         panel.name,
-          visible:       true,
-          ingressSession: ingress!.session,
-          initScript,
-        }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
-      } else {
-        invoke('create_panel_webview', {
-          label,
-          url:           directUrl,
-          x:             ox + pct(panel.x, sw),
-          y:             oy + pct(panel.y, sh),
-          width:         pct(panel.w, sw),
-          height:        pct(panel.h, sh),
-          title:         panel.name,
-          visible:       true,
-          ingressSession: null,
-          initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
-        }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
-      }
+      // Always use the direct canvas-kiosk URL with hassTokens auth injection.
+      // The ingress path (loading full HA frontend + iframe overlay) is unreliable
+      // on kiosk hardware and only needed for Lovelace cards, which aren't used here.
+      invoke('create_panel_webview', {
+        label,
+        url:           directUrl,
+        x:             ox + pct(panel.x, sw),
+        y:             oy + pct(panel.y, sh),
+        width:         pct(panel.w, sw),
+        height:        pct(panel.h, sh),
+        title:         panel.name,
+        visible:       true,
+        ingressSession: null,
+        initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
+      }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
       panelLabelsRef.current.push(label);
     }
 
