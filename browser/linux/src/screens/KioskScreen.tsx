@@ -151,8 +151,8 @@ async function closeAllPanelWindows() {
 function resolvePanelUrl(panel: PagePanel, config: AppConfig, _deviceId: string): string {
   if (panel.url) return panel.url;
   // view_id is a canvas-ui-hacs view slug — load via the kiosk panel
-  if (panel.view_id) return `${config.haUrl}/canvas-kiosk#${encodeURIComponent(panel.view_id)}`;
-  return `${config.haUrl}/canvas-kiosk`;
+  if (panel.view_id) return `${config.haUrl}/canvas-ui-static/kiosk.html#${encodeURIComponent(panel.view_id)}`;
+  return `${config.haUrl}/canvas-ui-static/kiosk.html`;
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -338,7 +338,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         // Kiosk navigates (or creates) a single fullscreen window to
         //   ha_host/canvas-kiosk#<canvas_view_id>
         const canvas_view_id = cmd.canvas_view_id as string | undefined;
-        const url = `${config.haUrl}/canvas-kiosk${canvas_view_id ? '#' + canvas_view_id : ''}`;
+        const url = `${config.haUrl}/canvas-ui-static/kiosk.html${canvas_view_id ? '#' + canvas_view_id : ''}`;
         const label = 'panel-fallback';
         const existing = await WebviewWindow.getByLabel(label);
         if (existing) {
@@ -453,7 +453,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       const sh = window.screen.height;
       invoke('create_panel_webview', {
         label,
-        url:           `${config.haUrl}/canvas-kiosk`,
+        url:           `${config.haUrl}/canvas-ui-static/kiosk.html`,
         x:             window.screenX ?? 0,
         y:             window.screenY ?? 0,
         width:         sw,
