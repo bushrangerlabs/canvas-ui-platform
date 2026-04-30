@@ -74,19 +74,9 @@ function pct(percent: number, total: number) {
  * 3. On DOMContentLoaded, hides HA chrome and injects a full-screen iframe
  *    pointing to the canvas display view via HA ingress.
  */
-/** Minimal init script: set hassTokens so HA auto-logs in, and nuke any HA
- *  service worker that would intercept our static file request and serve the
- *  full HA frontend (causing the "Loading data" crash on kiosk hardware).
- *
- *  HA registers a PWA service worker on its origin. If a previous HA page was
- *  ever loaded in this WebKit profile, the SW persists and intercepts ALL same-
- *  origin navigations — including /canvas-ui-static/kiosk.html — returning the
- *  cached HA app shell instead of our lightweight file.
- *
- *  Strategy: this initScript runs on EVERY page loaded in the webview (even the
- *  HA shell served by the SW). If we detect registered SWs we unregister them
- *  all and reload. On the reload no SW is present so the real file is fetched.
- *  We guard against infinite loops with a sessionStorage flag.
+/** Minimal init script: set hassTokens so HA auto-logs in.
+ *  Panel webviews run in incognito mode (no persisted SW or cache) so the
+ *  HA PWA service worker can never intercept requests in panel webviews.
  */
 function buildHAAuthScript(haUrl: string, haToken: string): string {
   const hassTokens = JSON.stringify({
@@ -99,22 +89,7 @@ function buildHAAuthScript(haUrl: string, haToken: string): string {
     refresh_token: '',
   });
   const tokensJson = JSON.stringify(hassTokens);
-  return `(function(){
-  // 1. Store HA auth tokens so canvas-kiosk auto-authenticates.
-  try{ localStorage.setItem('hassTokens', ${tokensJson}); }catch(e){}
-
-  // 2. Nuke HA's PWA service worker — prevents it from intercepting our
-  //    /canvas-ui-static/ requests and serving the heavy HA app shell.
-  if ('serviceWorker' in navigator && !sessionStorage.getItem('__sw_cleared')) {
-    navigator.serviceWorker.getRegistrations().then(function(regs) {
-      if (!regs.length) return;
-      sessionStorage.setItem('__sw_cleared', '1');
-      Promise.all(regs.map(function(r){ return r.unregister(); })).then(function() {
-        window.location.reload();
-      });
-    });
-  }
-})();`
+  return `(function(){ try{ localStorage.setItem('hassTokens', ${tokensJson}); }catch(e){} })();`;
 }
 
 function buildHAKioskScript(params: {

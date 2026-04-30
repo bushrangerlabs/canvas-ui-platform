@@ -134,7 +134,14 @@ fn create_panel_webview(
         .resizable(false)
         .skip_taskbar(true)
         .visible(visible)
-        .title(&title);
+        .title(&title)
+        // Incognito mode: no shared storage state between webviews or sessions.
+        // This is critical on kiosk hardware — without it, HA's PWA service worker
+        // (registered from a prior HA page load in the same WebKit profile) persists
+        // and intercepts ALL same-origin requests, returning the cached HA frontend
+        // app shell ("Loading data") instead of our lightweight kiosk.html.
+        // Incognito gives each panel a clean, empty storage context: no SW, no cache.
+        .incognito(true);
 
         // Inject ingress_session cookie BEFORE any page script runs.
         // The initialization script executes in the context of the loaded origin
