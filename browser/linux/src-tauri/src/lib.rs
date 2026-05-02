@@ -150,7 +150,7 @@ fn create_panel_webview(
         .skip_taskbar(true)
         .visible(visible)
         .title(&title)
-        .incognito(true);
+        .incognito(false);
 
         if let Some(session) = ingress_session {
             let safe_session: String = session.chars()
@@ -232,8 +232,13 @@ pub fn run() {
         unsafe { std::env::set_var("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1"); }
         unsafe { std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1"); }
         unsafe { std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1"); }
-        unsafe { std::env::set_var("JSC_useLLInt", "true"); }
-        klog("env vars set: SANDBOX disabled, COMPOSITING disabled, SW GL, JSC LLInt");
+        // Disable DMA-BUF renderer — can produce NULL GdkGLContext on software GL,
+        // triggering a null-ptr crash in WebKit's rendering pipeline (offset +0x48).
+        unsafe { std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1"); }
+        // JSC_useLLInt removed — forces HA's massive JS to run 10x slower through the
+        // bytecode interpreter, creating timing windows that trigger null-pointer crashes
+        // in WebKit's GObject layer. JIT is stable on 2.50.4 without LLInt enforcement.
+        klog("env vars set: SANDBOX disabled, COMPOSITING disabled, SW GL, DMABUF disabled");
     }
 
     // Panic hook — write to log before process unwinds
