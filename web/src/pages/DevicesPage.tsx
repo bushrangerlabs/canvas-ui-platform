@@ -13,6 +13,8 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import LayersIcon from '@mui/icons-material/Layers';
+import ReplayIcon from '@mui/icons-material/Replay';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import { useNavigate } from 'react-router-dom';
 import { api, pagesApi } from '../api/client';
 import type { Device, Page } from '../types';
@@ -90,6 +92,14 @@ export default function DevicesPage() {
       await api.delete(`/api/devices/${deleteDevice.id}`);
       setDeleteDevice(null);
       load();
+    } catch (e: any) {
+      setError(e.message);
+    }
+  };
+
+  const sendDeviceCommand = async (deviceId: string, action: string) => {
+    try {
+      await api.post(`/api/devices/${deviceId}/command`, { action });
     } catch (e: any) {
       setError(e.message);
     }
@@ -182,6 +192,20 @@ export default function DevicesPage() {
                       </Typography>
                     </TableCell>
                     <TableCell align="right">
+                      <Tooltip title="Reload app">
+                        <span>
+                          <IconButton size="small" color="primary" disabled={!dev.online} onClick={() => sendDeviceCommand(dev.id, 'reload')}>
+                            <ReplayIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Kill app">
+                        <span>
+                          <IconButton size="small" color="warning" disabled={!dev.online} onClick={() => sendDeviceCommand(dev.id, 'quit')}>
+                            <PowerSettingsNewIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
                       <Tooltip title="Edit device">
                         <IconButton size="small" onClick={() => openEdit(dev)}>
                           <EditIcon fontSize="small" />

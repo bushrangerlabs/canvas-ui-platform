@@ -439,6 +439,17 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         await closeAllPanelWindows();
         window.location.reload();
         break;
+
+      case 'quit':
+        invoke('quit_app').catch(console.error);
+        break;
+
+      // Generic command envelope sent by POST /api/devices/:id/command
+      case 'command': {
+        const action = cmd.action as string | undefined;
+        if (action) await handleCommand({ ...cmd, type: action });
+        break;
+      }
     }
   }, [openPanelWindows, loadedPage]);
 

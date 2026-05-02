@@ -22,6 +22,13 @@ fn klog(msg: &str) {
     eprintln!("[canvas-ui] {}", msg);
 }
 
+/// Quit the application immediately.
+#[tauri::command]
+fn quit_app() {
+    klog("[quit_app] quitting on server command");
+    std::process::exit(0);
+}
+
 /// Turn the display off using xset (Linux only)
 #[tauri::command]
 async fn screen_off(app: AppHandle) -> Result<(), String> {
