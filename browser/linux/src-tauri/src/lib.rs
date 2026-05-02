@@ -28,6 +28,8 @@ fn klog(msg: &str) {
 fn quit_app(app: AppHandle) {
     klog("[quit_app] quitting on server command");
     app.exit(0);
+    // Hard fallback in case app.exit doesn't terminate the process
+    std::process::exit(0);
 }
 
 /// Turn the display off using xset (Linux only)

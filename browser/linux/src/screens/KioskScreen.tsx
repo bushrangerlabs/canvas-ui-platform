@@ -564,7 +564,6 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         <DialogActions>
           <Button onClick={() => setShowQuitDialog(false)}>Cancel</Button>
           <Button color="error" variant="contained" onClick={async () => {
-            await closeAllPanelWindows();
             invoke('quit_app').catch(console.error);
           }}>Quit</Button>
         </DialogActions>
