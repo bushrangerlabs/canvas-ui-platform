@@ -22,37 +22,12 @@ fn klog(msg: &str) {
     eprintln!("[canvas-ui] {}", msg);
 }
 
-/// Quit the application immediately.
-///
-/// On Linux we use `pkill -9 -x <binary>` so every process with our
-/// executable name is killed — the main process AND all WebKit2GTK child
-/// processes (web workers, GPU process, network process) regardless of
-/// which process group or session they ended up in.
-/// Fallback: kill our own process group, then exit.
+/// Quit the application cleanly via Tauri's own exit — closes all windows
+/// and webviews before the process terminates.
 #[tauri::command]
-fn quit_app() {
+fn quit_app(app: AppHandle) {
     klog("[quit_app] quitting on server command");
-    #[cfg(target_os = "linux")]
-    {
-        // Try pkill first — most thorough
-        let binary = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-            .unwrap_or_else(|| "canvas-ui-browser-linux".to_string());
-        klog(&format!("[quit_app] pkill -9 -x {}", binary));
-        let _ = std::process::Command::new("pkill")
-            .args(["-9", "-x", &binary])
-            .spawn();
-        // Give pkill a moment, then kill our own group + hard exit as fallback
-        std::thread::sleep(std::time::Duration::from_millis(300));
-        unsafe {
-            let pgid = libc::getpgrp();
-            libc::kill(-pgid, libc::SIGKILL);
-        }
-        std::process::exit(1);
-    }
-    #[cfg(not(target_os = "linux"))]
-    std::process::exit(0);
+    app.exit(0);
 }
 
 /// Turn the display off using xset (Linux only)
