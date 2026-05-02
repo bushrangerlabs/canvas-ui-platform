@@ -22,13 +22,17 @@ fn klog(msg: &str) {
     eprintln!("[canvas-ui] {}", msg);
 }
 
-/// Quit the application immediately — kills the whole process group so
-/// WebKit2GTK child processes don't linger after the main process exits.
+/// Quit the application immediately — sends SIGKILL to our entire process
+/// group (main process + all WebKit2GTK child processes).
 #[tauri::command]
 fn quit_app() {
     klog("[quit_app] quitting on server command");
     #[cfg(target_os = "linux")]
-    unsafe { libc::kill(0, libc::SIGKILL); }
+    unsafe {
+        // kill(-pgid, sig) targets every process in our process group
+        let pgid = libc::getpgrp();
+        libc::kill(-pgid, libc::SIGKILL);
+    }
     #[cfg(not(target_os = "linux"))]
     std::process::exit(0);
 }

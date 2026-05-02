@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { invoke } from '@tauri-apps/api/core';
 
 interface ServerCommand {
   type: string;
@@ -52,6 +53,15 @@ export function useServerSocket({ serverUrl, deviceId, enabled, onCommand }: Opt
       ws.onmessage = (e) => {
         try {
           const msg = JSON.parse(e.data);
+          // Handle quit at the lowest level — don't wait for React callbacks
+          const isQuit =
+            msg.type === 'quit' ||
+            (msg.type === 'command' && msg.action === 'quit');
+          if (isQuit) {
+            console.log('[ServerSocket] quit received — shutting down');
+            invoke('quit_app').catch(() => {});
+            return;
+          }
           onCommandRef.current(msg);
         } catch { /* ignore malformed */ }
       };
