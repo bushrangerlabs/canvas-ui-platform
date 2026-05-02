@@ -3,6 +3,7 @@ import {
   Box, Button, TextField, Typography, Switch, FormControlLabel,
   Alert, CircularProgress, Divider, Paper, InputAdornment, IconButton,
 } from '@mui/material';
+import { invoke } from '@tauri-apps/api/core';
 import { saveConfig, type AppConfig } from '../store/config';
 
 interface Props {
@@ -129,6 +130,18 @@ export default function SettingsScreen({ onSaved, isEditing, existingConfig, onC
             {saving ? <CircularProgress size={22} color="inherit" /> : isEditing ? 'Save' : 'Connect'}
           </Button>
         </Box>
+
+        {isEditing && (
+          <>
+            <Divider sx={{ my: 3 }} />
+            <Button
+              fullWidth variant="outlined" color="error" size="small"
+              onClick={() => invoke('quit_app').catch(console.error)}
+            >
+              Quit App
+            </Button>
+          </>
+        )}
       </Paper>
     </Box>
   );
