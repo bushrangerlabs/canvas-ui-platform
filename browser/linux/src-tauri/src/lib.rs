@@ -1,6 +1,8 @@
 use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::ShellExt;
 use std::io::Write;
+#[cfg(target_os = "linux")]
+use libc;
 
 // ─── Crash Log ────────────────────────────────────────────────────────────────
 
@@ -239,6 +241,34 @@ pub fn run() {
         klog(&format!("PANIC: {}", info));
         eprintln!("[canvas-ui] PANIC: {}", info);
     }));
+
+    // Raw signal handlers — catch SIGSEGV/SIGABRT from deep inside GTK/WebKit.
+    // We write to the log file then re-raise to get a proper core dump.
+    #[cfg(target_os = "linux")]
+    unsafe {
+        unsafe extern "C" fn fatal_handler(sig: libc::c_int) {
+            let msg = match sig {
+                libc::SIGSEGV => "SIGNAL: SIGSEGV (segmentation fault)",
+                libc::SIGABRT => "SIGNAL: SIGABRT (abort)",
+                libc::SIGBUS  => "SIGNAL: SIGBUS (bus error)",
+                _             => "SIGNAL: unknown fatal signal",
+            };
+            // Write directly — async-signal-safe path
+            if let Ok(mut f) = std::fs::OpenOptions::new()
+                .create(true).append(true).open(LOG_PATH)
+            {
+                let _ = std::io::Write::write_all(&mut f, msg.as_bytes());
+                let _ = std::io::Write::write_all(&mut f, b"\n");
+            }
+            // Reset to default and re-raise so we still get a core dump
+            libc::signal(sig, libc::SIG_DFL);
+            libc::raise(sig);
+        }
+        libc::signal(libc::SIGSEGV, fatal_handler as libc::sighandler_t);
+        libc::signal(libc::SIGABRT, fatal_handler as libc::sighandler_t);
+        libc::signal(libc::SIGBUS,  fatal_handler as libc::sighandler_t);
+        klog("signal handlers installed: SIGSEGV SIGABRT SIGBUS");
+    }
 
     klog("building Tauri app...");
     tauri::Builder::default()

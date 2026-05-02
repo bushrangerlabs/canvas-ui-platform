@@ -296,10 +296,10 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       const label = `panel-${panel.id}`;
       const directUrl = resolvePanelUrl(panel, config, deviceId);
 
-      // Always use the direct canvas-kiosk URL with hassTokens auth injection.
-      // The ingress path (loading full HA frontend + iframe overlay) is unreliable
-      // on kiosk hardware and only needed for Lovelace cards, which aren't used here.
-      invoke('create_panel_webview', {
+      // Await each panel creation before starting the next one.
+      // Creating all panels simultaneously causes WebKit's NetworkProcess to crash
+      // on kiosk hardware when multiple HA WebSocket connections race at startup.
+      await invoke('create_panel_webview', {
         label,
         url:           directUrl,
         x:             ox + pct(panel.x, sw),
@@ -312,6 +312,9 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
       }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
       panelLabelsRef.current.push(label);
+      // Give WebKit 800ms to stabilise its subprocess before spawning the next
+      // webview — prevents the NetworkProcess from being overwhelmed at startup.
+      await new Promise(r => setTimeout(r, 800));
     }
 
     if (floating?.url) {
