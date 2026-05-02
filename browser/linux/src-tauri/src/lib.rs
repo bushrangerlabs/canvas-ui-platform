@@ -1,5 +1,24 @@
 use tauri::{AppHandle, Manager};
 use tauri_plugin_shell::ShellExt;
+use std::io::Write;
+
+// ─── Crash Log ────────────────────────────────────────────────────────────────
+
+const LOG_PATH: &str = "/tmp/canvas-ui-kiosk.log";
+
+fn klog(msg: &str) {
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true).append(true).open(LOG_PATH)
+    {
+        let ts = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        let _ = writeln!(f, "[{}] {}", ts, msg);
+        let _ = f.flush();
+    }
+    eprintln!("[canvas-ui] {}", msg);
+}
 
 /// Turn the display off using xset (Linux only)
 #[tauri::command]
@@ -63,6 +82,7 @@ async fn keep_screen_on(app: AppHandle) -> Result<(), String> {
 /// Must run on the GTK main thread on Linux — same restriction as build().
 #[tauri::command]
 async fn navigate_webview(app: AppHandle, label: String, url: String) -> Result<(), String> {
+    klog(&format!("[navigate_webview] label={} url={}", label, url));
     let parsed = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
     let app_handle = app.clone();
     app.run_on_main_thread(move || {
@@ -96,13 +116,6 @@ fn app_version(app: AppHandle) -> String {
     app.package_info().version.to_string()
 }
 
-/// Create a panel WebviewWindow, optionally injecting an ingress_session cookie
-/// before the page loads so it passes HA ingress auth.
-/// This enables Lovelace cards to access HA's custom element registry.
-///
-/// NOTE: WebviewWindowBuilder::build() must run on the main GTK/wry thread on
-/// Linux. Sync Tauri commands run on a thread pool, so we dispatch via
-/// run_on_main_thread to avoid a panic/crash.
 #[tauri::command]
 fn create_panel_webview(
     app: AppHandle,
@@ -115,14 +128,14 @@ fn create_panel_webview(
     title: String,
     visible: bool,
     ingress_session: Option<String>,
-    // Additional initialization script injected after the ingress cookie script.
-    // Used by the kiosk to load the canvas view inside the HA frontend document.
     init_script: Option<String>,
 ) -> Result<(), String> {
+    klog(&format!("[create_panel_webview] label={} url={}", label, url));
     let parsed_url = url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
     let app_handle = app.clone();
 
     app.run_on_main_thread(move || {
+        klog(&format!("[create_panel_webview] on main thread, building '{}'", label));
         let mut builder = tauri::WebviewWindowBuilder::new(
             &app_handle,
             &label,
@@ -135,19 +148,9 @@ fn create_panel_webview(
         .skip_taskbar(true)
         .visible(visible)
         .title(&title)
-        // Incognito mode: no shared storage state between webviews or sessions.
-        // This is critical on kiosk hardware — without it, HA's PWA service worker
-        // (registered from a prior HA page load in the same WebKit profile) persists
-        // and intercepts ALL same-origin requests, returning the cached HA frontend
-        // app shell ("Loading data") instead of our lightweight kiosk.html.
-        // Incognito gives each panel a clean, empty storage context: no SW, no cache.
         .incognito(true);
 
-        // Inject ingress_session cookie BEFORE any page script runs.
-        // The initialization script executes in the context of the loaded origin
-        // (ha:8123) so document.cookie sets it for that domain.
         if let Some(session) = ingress_session {
-            // Sanitize: strip any chars that could break out of the JS string
             let safe_session: String = session.chars()
                 .filter(|c| c.is_alphanumeric() || *c == '-' || *c == '_')
                 .collect();
@@ -162,15 +165,17 @@ fn create_panel_webview(
             builder = builder.initialization_script(&script);
         }
 
+        klog(&format!("[create_panel_webview] calling builder.build() for '{}'", label));
         match builder.build() {
             Err(e) => {
+                klog(&format!("[create_panel_webview] BUILD FAILED '{}': {}", label, e));
                 eprintln!("[create_panel_webview] failed to build '{}': {}", label, e);
             }
             Ok(win) => {
-                // Disable GPU/hardware acceleration for panel windows on Linux.
-                // WebKitGTK GPU compositing crashes on many kiosk/embedded systems.
+                klog(&format!("[create_panel_webview] build OK for '{}'", label));
                 #[cfg(target_os = "linux")]
                 let _ = win.with_webview(|wv| {
+                    klog("[create_panel_webview] applying webkit settings (no GPU)");
                     use webkit2gtk::{SettingsExt, WebViewExt};
                     let wk = wv.inner();
                     if let Some(settings) = wk.settings() {
@@ -178,31 +183,36 @@ fn create_panel_webview(
                             webkit2gtk::HardwareAccelerationPolicy::Never,
                         );
                     }
+                    klog("[create_panel_webview] webkit settings applied");
                 });
+                klog(&format!("[create_panel_webview] done '{}'", label));
             }
         }
     }).map_err(|e| e.to_string())
 }
 
 pub fn run() {
+    // Truncate/create the log file fresh on each run
+    let _ = std::fs::write(LOG_PATH, "");
+    klog("=== Canvas UI kiosk starting ===");
+
     // Set WebKit2GTK environment variables before anything initializes.
-    // These must be set before the GTK/WebKit process tree starts.
     #[cfg(target_os = "linux")]
     {
-        // Disable the WebKit network process sandbox — on many kiosk/embedded
-        // Linux systems the sandbox prevents the WebProcess from loading any
-        // resources, causing segfault + "internallyFailedLoadTimerFired" errors.
         unsafe { std::env::set_var("WEBKIT_DISABLE_SANDBOX_THIS_IS_DANGEROUS", "1"); }
-        // Disable GPU compositing — crashes on systems without proper DRI/DMA-buf.
         unsafe { std::env::set_var("WEBKIT_DISABLE_COMPOSITING_MODE", "1"); }
-        // Force software rendering in the GPU process as a belt-and-suspenders.
         unsafe { std::env::set_var("LIBGL_ALWAYS_SOFTWARE", "1"); }
-        // Disable JavaScriptCore JIT — JIT codegen crashes on some kiosk/embedded
-        // Linux systems (seen as segfault deep in libjavascriptcoregtk-4.1.so.0).
-        // JSC_useLLInt forces the stable bytecode interpreter path.
         unsafe { std::env::set_var("JSC_useLLInt", "true"); }
+        klog("env vars set: SANDBOX disabled, COMPOSITING disabled, SW GL, JSC LLInt");
     }
 
+    // Panic hook — write to log before process unwinds
+    std::panic::set_hook(Box::new(|info| {
+        klog(&format!("PANIC: {}", info));
+        eprintln!("[canvas-ui] PANIC: {}", info);
+    }));
+
+    klog("building Tauri app...");
     tauri::Builder::default()
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_store::Builder::default().build())
@@ -218,9 +228,7 @@ pub fn run() {
             create_panel_webview,
         ])
         .setup(|app| {
-            // Disable hardware acceleration for the main window on Linux.
-            // WebKitGTK 2.44+ hardware compositing (GPU process + DMA-buf) crashes
-            // on many kiosk/embedded systems. Software rendering is stable.
+            klog("setup: disabling GPU on main window");
             #[cfg(target_os = "linux")]
             if let Some(win) = app.get_webview_window("main") {
                 let _ = win.with_webview(|wv| {
@@ -233,12 +241,13 @@ pub fn run() {
                     }
                 });
             }
+            klog("setup: main window ready, spawning keep_screen_on");
 
-            // Disable screen saver and DPMS on launch for kiosk mode
             let app_handle = app.handle().clone();
             tauri::async_runtime::spawn(async move {
                 let _ = keep_screen_on(app_handle).await;
             });
+            klog("setup: done");
             Ok(())
         })
         .run(tauri::generate_context!())
