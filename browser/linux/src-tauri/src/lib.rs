@@ -22,16 +22,34 @@ fn klog(msg: &str) {
     eprintln!("[canvas-ui] {}", msg);
 }
 
-/// Quit the application immediately — sends SIGKILL to our entire process
-/// group (main process + all WebKit2GTK child processes).
+/// Quit the application immediately.
+///
+/// On Linux we use `pkill -9 -x <binary>` so every process with our
+/// executable name is killed — the main process AND all WebKit2GTK child
+/// processes (web workers, GPU process, network process) regardless of
+/// which process group or session they ended up in.
+/// Fallback: kill our own process group, then exit.
 #[tauri::command]
 fn quit_app() {
     klog("[quit_app] quitting on server command");
     #[cfg(target_os = "linux")]
-    unsafe {
-        // kill(-pgid, sig) targets every process in our process group
-        let pgid = libc::getpgrp();
-        libc::kill(-pgid, libc::SIGKILL);
+    {
+        // Try pkill first — most thorough
+        let binary = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+            .unwrap_or_else(|| "canvas-ui-browser-linux".to_string());
+        klog(&format!("[quit_app] pkill -9 -x {}", binary));
+        let _ = std::process::Command::new("pkill")
+            .args(["-9", "-x", &binary])
+            .spawn();
+        // Give pkill a moment, then kill our own group + hard exit as fallback
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        unsafe {
+            let pgid = libc::getpgrp();
+            libc::kill(-pgid, libc::SIGKILL);
+        }
+        std::process::exit(1);
     }
     #[cfg(not(target_os = "linux"))]
     std::process::exit(0);
