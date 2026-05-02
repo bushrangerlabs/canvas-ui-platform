@@ -15,7 +15,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Box, Button, CircularProgress, Typography } from '@mui/material';
+import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api/core';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { nanoid } from 'nanoid';
@@ -167,6 +167,7 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
   const [appState, setAppState]     = useState<AppState>('registering');
   const [errorMsg, setErrorMsg]     = useState('');
   const [retryCount, setRetryCount] = useState(0);
+  const [showQuitDialog, setShowQuitDialog] = useState(false);
   const retryTimerRef               = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [deviceId, setDeviceId]     = useState(config.deviceId ?? '');
   const [loadedPage, setLoadedPage] = useState<LoadedPage | null>(null);
@@ -440,6 +441,10 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         window.location.reload();
         break;
 
+      case 'show_quit_dialog':
+        setShowQuitDialog(true);
+        break;
+
       // Generic command envelope sent by POST /api/devices/:id/command
       case 'command': {
         const action = cmd.action as string | undefined;
@@ -533,6 +538,18 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         onClick={handleCornerTap}
         sx={{ position: 'absolute', top: 0, right: 0, width: 60, height: 60, zIndex: 9999, cursor: 'default' }}
       />
+
+      {/* Quit confirmation dialog — triggered by add-on or settings */}
+      <Dialog open={showQuitDialog} onClose={() => setShowQuitDialog(false)}>
+        <DialogTitle>Quit Canvas UI?</DialogTitle>
+        <DialogContent>
+          <DialogContentText>This will close the kiosk app.</DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowQuitDialog(false)}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={() => invoke('quit_app').catch(console.error)}>Quit</Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

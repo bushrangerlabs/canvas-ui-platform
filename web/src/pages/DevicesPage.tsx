@@ -14,6 +14,7 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import MonitorIcon from '@mui/icons-material/Monitor';
 import LayersIcon from '@mui/icons-material/Layers';
 import ReplayIcon from '@mui/icons-material/Replay';
+import PowerSettingsNewIcon from '@mui/icons-material/PowerSettingsNew';
 import { useNavigate } from 'react-router-dom';
 import { api, pagesApi } from '../api/client';
 import type { Device, Page } from '../types';
@@ -195,6 +196,13 @@ export default function DevicesPage() {
                         <span>
                           <IconButton size="small" color="primary" disabled={!dev.online} onClick={() => sendDeviceCommand(dev.id, 'reload')}>
                             <ReplayIcon fontSize="small" />
+                          </IconButton>
+                        </span>
+                      </Tooltip>
+                      <Tooltip title="Quit app">
+                        <span>
+                          <IconButton size="small" color="warning" disabled={!dev.online} onClick={() => sendDeviceCommand(dev.id, 'show_quit_dialog')}>
+                            <PowerSettingsNewIcon fontSize="small" />
                           </IconButton>
                         </span>
                       </Tooltip>
