@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { nanoid } from 'nanoid';
 import { clearConfig, saveDeviceId, type AppConfig } from '../store/config';
@@ -442,6 +443,9 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         break;
 
       case 'show_quit_dialog':
+        // Raise the main window above the panel webviews so the dialog is visible
+        await getCurrentWindow().setAlwaysOnTop(true);
+        await getCurrentWindow().setFocus();
         setShowQuitDialog(true);
         break;
 
@@ -540,14 +544,17 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
       />
 
       {/* Quit confirmation dialog — triggered by add-on or settings */}
-      <Dialog open={showQuitDialog} onClose={() => setShowQuitDialog(false)}>
+      <Dialog open={showQuitDialog} onClose={async () => { await getCurrentWindow().setAlwaysOnTop(false); setShowQuitDialog(false); }}>
         <DialogTitle>Quit Canvas UI?</DialogTitle>
         <DialogContent>
           <DialogContentText>This will close the kiosk app.</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setShowQuitDialog(false)}>Cancel</Button>
-          <Button color="error" variant="contained" onClick={() => invoke('quit_app').catch(console.error)}>Quit</Button>
+          <Button onClick={async () => { await getCurrentWindow().setAlwaysOnTop(false); setShowQuitDialog(false); }}>Cancel</Button>
+          <Button color="error" variant="contained" onClick={async () => {
+            await closeAllPanelWindows();
+            invoke('quit_app').catch(console.error);
+          }}>Quit</Button>
         </DialogActions>
       </Dialog>
     </Box>
