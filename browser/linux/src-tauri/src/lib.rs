@@ -179,8 +179,17 @@ fn create_panel_webview(
                 let label2 = label.clone();
                 #[cfg(target_os = "linux")]
                 let _ = win.with_webview(move |wv| {
-                    use webkit2gtk::{SettingsExt, WebViewExt};
+                    use webkit2gtk::{ProcessModel, SettingsExt, WebContextExt, WebViewExt};
                     let wk = wv.inner();
+
+                    // Force each webview into its own web process — prevents the
+                    // null-ptr SIGSEGV in libwebkit2gtk when multiple same-origin
+                    // pages (e.g. two HA URLs) share a single WebKit secondary process
+                    // and race-crash during heavy JavaScript initialisation.
+                    if let Some(ctx) = wk.web_context() {
+                        ctx.set_process_model(ProcessModel::MultipleSecondaryProcesses);
+                        klog(&format!("[{}] process model set to MultipleSecondaryProcesses", label2));
+                    }
 
                     if let Some(settings) = wk.settings() {
                         settings.set_hardware_acceleration_policy(
