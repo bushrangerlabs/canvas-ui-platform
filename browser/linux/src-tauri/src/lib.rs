@@ -182,38 +182,13 @@ fn create_panel_webview(
                     use webkit2gtk::{SettingsExt, WebViewExt};
                     let wk = wv.inner();
 
-                    // Disable GPU acceleration
                     if let Some(settings) = wk.settings() {
                         settings.set_hardware_acceleration_policy(
                             webkit2gtk::HardwareAccelerationPolicy::Never,
                         );
-                        // Echo JS console.log / error / warn to stderr so we can see
-                        // what the page was doing just before the crash
-                        settings.set_enable_write_console_messages_to_stdout(true);
-                        // Disable page cache to reduce memory pressure on kiosk hw
                         settings.set_enable_page_cache(false);
                         klog(&format!("[{}] webkit settings applied", label2));
                     }
-
-                    // Catch WebKit subprocess death — logs the reason to the file
-                    // before the whole process is taken down.
-                    let lbl = label2.clone();
-                    wk.connect_web_process_terminated(move |_wv, reason| {
-                        klog(&format!(
-                            "[{}] WEB PROCESS TERMINATED reason={:?}",
-                            lbl, reason
-                        ));
-                    });
-
-                    // Log load failures (network errors, HTTP errors etc)
-                    let lbl2 = label2.clone();
-                    wk.connect_load_failed(move |_wv, _load_event, failed_uri, error| {
-                        klog(&format!(
-                            "[{}] LOAD FAILED uri={} err={}",
-                            lbl2, failed_uri, error
-                        ));
-                        false // don't suppress default handling
-                    });
                 });
                 klog(&format!("[create_panel_webview] done '{}'", label));
             }

@@ -312,9 +312,9 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         initScript:    config.haToken ? buildHAAuthScript(config.haUrl, config.haToken) : null,
       }).catch(e => console.error(`[${label}] create_panel_webview error:`, e));
       panelLabelsRef.current.push(label);
-      // Give WebKit 800ms to stabilise its subprocess before spawning the next
+      // Give WebKit 2000ms to stabilise its subprocess before spawning the next
       // webview — prevents the NetworkProcess from being overwhelmed at startup.
-      await new Promise(r => setTimeout(r, 800));
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     if (floating?.url) {
