@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Box, Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogContentText, DialogTitle, Typography } from '@mui/material';
 import { invoke } from '@tauri-apps/api/core';
+import { getCurrentWindow } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { nanoid } from 'nanoid';
 import { clearConfig, saveDeviceId, type AppConfig } from '../store/config';
@@ -564,7 +565,8 @@ export default function KioskScreen({ config, onResetConfig }: Props) {
         <DialogActions>
           <Button onClick={() => setShowQuitDialog(false)}>Cancel</Button>
           <Button color="error" variant="contained" onClick={async () => {
-            invoke('quit_app').catch(console.error);
+            await closeAllPanelWindows();
+            await getCurrentWindow().close();
           }}>Quit</Button>
         </DialogActions>
       </Dialog>
